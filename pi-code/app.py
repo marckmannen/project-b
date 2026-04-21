@@ -6,15 +6,23 @@ app = Flask(__name__)
 
 # --- GPIO Setup ---
 # Uncomment the block below when running on a real Raspberry Pi 5
-from gpiozero import OutputDevice
+from gpiozero import OutputDevice, Device
+from gpiozero.pins.lgpio import LGPIOFactory
+
+# Force a fresh pin factory so stale claims from a previous run are cleared
+Device.pin_factory = LGPIOFactory()
+
 ACTUATORS_PINS = {
-    "actuator_1": OutputDevice(17),
-    "actuator_2": OutputDevice(27),
-    "actuator_3": OutputDevice(22),
-    "actuator_4": OutputDevice(23),
+    "actuator_1": OutputDevice(17, initial_value=False),
+    "actuator_2": OutputDevice(27, initial_value=False),
+    "actuator_3": OutputDevice(22, initial_value=False),
+    "actuator_4": OutputDevice(23, initial_value=False),
 }
 
-# # --- Mock GPIO for development/testing off-Pi ---
+import atexit
+atexit.register(lambda: [p.close() for p in ACTUATORS_PINS.values()])
+
+# --- Mock GPIO for development/testing off-Pi ---
 # class MockPin:
 #     def __init__(self, pin):
 #         self.pin = pin
