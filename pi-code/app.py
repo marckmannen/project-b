@@ -6,35 +6,35 @@ app = Flask(__name__)
 
 # --- GPIO Setup ---
 # Uncomment the block below when running on a real Raspberry Pi 5
-# from gpiozero import OutputDevice
-# ACTUATORS_PINS = {
-#     "actuator_1": OutputDevice(17),
-#     "actuator_2": OutputDevice(27),
-#     "actuator_3": OutputDevice(22),
-#     "actuator_4": OutputDevice(23),
-# }
-
-# --- Mock GPIO for development/testing off-Pi ---
-class MockPin:
-    def __init__(self, pin):
-        self.pin = pin
-        self._active = False
-    def on(self):
-        self._active = True
-        print(f"[GPIO] Pin {self.pin} → ON")
-    def off(self):
-        self._active = False
-        print(f"[GPIO] Pin {self.pin} → OFF")
-    @property
-    def is_active(self):
-        return self._active
-
+from gpiozero import OutputDevice
 ACTUATORS_PINS = {
-    "actuator_1": MockPin(17),
-    "actuator_2": MockPin(27),
-    "actuator_3": MockPin(22),
-    "actuator_4": MockPin(23),
+    "actuator_1": OutputDevice(17),
+    "actuator_2": OutputDevice(27),
+    "actuator_3": OutputDevice(22),
+    "actuator_4": OutputDevice(23),
 }
+
+# # --- Mock GPIO for development/testing off-Pi ---
+# class MockPin:
+#     def __init__(self, pin):
+#         self.pin = pin
+#         self._active = False
+#     def on(self):
+#         self._active = True
+#         print(f"[GPIO] Pin {self.pin} → ON")
+#     def off(self):
+#         self._active = False
+#         print(f"[GPIO] Pin {self.pin} → OFF")
+#     @property
+#     def is_active(self):
+#         return self._active
+
+# ACTUATORS_PINS = {
+#     "actuator_1": MockPin(17),
+#     "actuator_2": MockPin(27),
+#     "actuator_3": MockPin(22),
+#     "actuator_4": MockPin(23),
+# }
 
 ACTUATOR_LABELS = {
     "actuator_1": "Relay 1",
