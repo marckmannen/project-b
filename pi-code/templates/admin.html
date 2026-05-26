@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Orders</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+<body>
+  <div class="admin-container">
+    <header class="admin-header">
+      <div class="header-left">
+        <h1>Orders</h1>
+        <div id="db-status" class="db-status">Checking DB...</div>
+      </div>
+      <div class="header-right">
+        <button id="refresh-btn" class="btn btn-sm">Refresh</button>
+        <button id="logout-btn" class="btn btn-outline">Logout</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="data-toolbar">
+        <div class="search-box">
+          <input type="text" id="search-input" placeholder="Filter orders...">
+        </div>
+        <span id="row-count" class="row-count"></span>
+      </div>
+
+      <div id="table-container" class="table-wrapper">
+        <div class="loading">Loading orders...</div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let orders = [];
+
+    async function apiFetch(url, options = {}) {
+      const res = await fetch(url, { credentials: 'same-origin', ...options });
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('json')) throw new Error('Session expired. Please log in again.');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    async function checkDbStatus() {
+      const el = document.getElementById('db-status');
+      try {
+        const data = await apiFetch('/api/db-status');
+        el.textContent = data.status === 'connected' ? 'Connected' : 'Disconnected';
+        el.className = "db-status " + (data.status === 'connected' ? 'connected' : 'disconnected');
+      } catch (e) { el.textContent = 'Error'; el.className = 'db-status disconnected'; }
+    }
+
+    async function loadOrders() {
+      const container = document.getElementById('table-container');
+      try {
+        const data = await apiFetch('/api/admin/orders');
+        orders = data;
+        renderOrders(orders);
+        document.getElementById('row-count').textContent = orders.length + ' orders';
+      } catch (err) {
+        container.innerHTML = '<div class="error-state">' + err.message + '</div>';
+      }
+    }
+
+    function renderOrders(data) {
+      const container = document.getElementById('table-container');
+      if (!data.length) {
+        container.innerHTML = '<div class="empty-state">No orders found</div>';
+        return;
+      }
+      const columns = Object.keys(data[0]);
+      let html = '<table><thead><tr>' + columns.map(c => '<th>' + c + '</th>').join('') + '</tr></thead>';
+      html += '<tbody>' + data.map(row =>
+        '<tr>' + columns.map(c => {
+          let val = row[c];
+          if (val === null) val = '<em>null</em>';
+          else if (typeof val === 'object') val = JSON.stringify(val);
+          return '<td title="' + val + '">' + val + '</td>';
+        }).join('') + '</tr>'
+      ).join('') + '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    document.getElementById('search-input').addEventListener('input', function(e) {
+      var q = e.target.value.toLowerCase();
+      if (!q) { renderOrders(orders); return; }
+      var filtered = orders.filter(function(row) {
+        return Object.values(row).some(function(v) { return String(v).toLowerCase().includes(q); });
+      });
+      renderOrders(filtered);
+      document.getElementById('row-count').textContent = filtered.length + ' of ' + orders.length;
+    });
+
+    document.getElementById('refresh-btn').addEventListener('click', loadOrders);
+
+    document.getElementById('logout-btn').addEventListener('click', async function() {
+      await fetch('/admin/logout', { method: 'POST', credentials: 'same-origin' });
+      window.location.href = '/admin/login';
+    });
+
+    checkDbStatus();
+    loadOrders();
+  </script>
+</body>
+</html>
