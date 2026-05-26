@@ -1,583 +1,764 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>medicijnkluis</title>
-  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700&display=swap" rel="stylesheet"/>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medicijnkluis / Medicine Vault</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0d0d3b;
+    --navy-mid: #12125a;
+    --lavender: #8585c8;
+    --lavender-light: #a8a8d8;
+    --lavender-btn: #7878be;
+    --white: #ffffff;
+    --gray-input: #d0d0d8;
+    --gray-text: #1a1a2e;
+    --accent: #5555aa;
+  }
 
-    :root {
-      --navy:   #12164a;
-      --lav:    rgba(139,144,200,0.58);
-      --lav-s:  rgba(139,144,200,0.38);
-      --lav-h:  rgba(139,144,200,0.75);
-      --lav-nb: #7b80bc;       /* solid for number-pad bg */
-      --text:   #ffffff;
-      --dim:    rgba(255,255,255,0.55);
-      --sans:   'Raleway', sans-serif;
-    }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--navy);
+    color: var(--white);
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
 
-    body {
-      background: var(--navy);
-      color: var(--text);
-      font-family: var(--sans);
-      display: flex;
-      flex-direction: column;
-    }
+  /* ── PAGES ── */
+  .page {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0; left: 0;
+    flex-direction: column;
+    animation: fadeIn 0.35s ease;
+  }
+  .page.active { display: flex; }
 
-    /* ── SCREENS ── */
-    .screen {
-      display: none;
-      flex-direction: column;
-      flex: 1;
-      position: relative;
-      /* padding-bottom keeps content above the back button */
-      padding-bottom: 90px;
-    }
-    .screen.active { display: flex; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 
-    /* ── LANGUAGE SWITCHER ── */
-    #lang-btn {
-      position: fixed;
-      top: 0; right: 0;
-      width: 110px; height: 110px;   /* big touch target */
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      cursor: pointer;
-      z-index: 100;
-    }
+  /* ── WELCOME ── */
+  #page-welcome {
+    align-items: flex-start;
+    justify-content: center;
+    padding: 48px 60px;
+    gap: 32px;
+    cursor: pointer;
+  }
+  .welcome-hero {
+    background: var(--lavender);
+    padding: 40px 50px 34px;
+    border-radius: 6px;
+    max-width: 600px;
+  }
+  .welcome-hero h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(56px, 9vw, 80px);
+    font-weight: 400;
+    line-height: 1;
+    color: var(--white);
+  }
+  .welcome-hero p {
+    font-size: clamp(18px, 2.4vw, 24px);
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    color: var(--white);
+    margin-top: 10px;
+  }
+  .welcome-proceed {
+    font-size: clamp(20px, 2.6vw, 28px);
+    font-weight: 300;
+    letter-spacing: 0.1em;
+    color: var(--lavender-light);
+    transition: color 0.2s;
+    margin-top: 12px;
+    padding-left: 6px;
+  }
+  .welcome-proceed:hover { color: var(--white); }
 
-    .flag-nl, .flag-en {
-      width: 68px; height: 45px;
-      border-radius: 4px;
-      overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-      flex-shrink: 0;
-    }
+  /* Language flag */
+  .lang-switch {
+    position: absolute;
+    top: 28px; right: 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    opacity: 0.85;
+    transition: opacity 0.2s;
+  }
+  .lang-switch:hover { opacity: 1; }
+  .lang-switch img {
+    border-radius: 4px;
+    /* box-shadow: 0 2px 6px rgba(0,0,0,0.25); */
+  }
+  .lang-label {
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    color: var(--lavender-light);
+    text-align: center;
+    line-height: 1.4;
+  }
+  .inner-page {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    overflow-y: auto;
+  }
+  .page-header {
+    background: var(--lavender);
+    padding: 24px 36px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(28px, 4vw, 38px);
+    font-weight: 400;
+    color: var(--white);
+    letter-spacing: 0.02em;
+  }
+  .page-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    gap: 40px;
+  }
 
-    .flag-nl { display: flex; flex-direction: column; }
-    .flag-nl .r { flex:1; }
-    .flag-nl .r1 { background:#ae1c28; }
-    .flag-nl .r2 { background:#ffffff; }
-    .flag-nl .r3 { background:#21468b; }
+  /* ── BACK ARROW ── */
+  .back-btn {
+    position: absolute;
+    bottom: 32px;
+    left: 32px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 26px 44px 26px 0;
+    border-color: transparent var(--white) transparent transparent;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.2s;
+  }
+  .back-btn:hover { opacity: 1; }
 
-    .flag-en { display: none; }
+  /* ── OPTION BUTTONS ── */
+  .option-btn {
+    background: var(--lavender-btn);
+    border: none;
+    border-radius: 6px;
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(22px, 3vw, 30px);
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    line-height: 1.4;
+    padding: 36px 40px;
+    min-width: 240px;
+    min-height: 190px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    text-align: left;
+  }
+  .option-btn:hover {
+    background: var(--lavender);
+    transform: translateY(-3px);
+  }
+  .option-btn:active { transform: translateY(0); }
 
-    #lang-btn.en .flag-nl { display: none; }
-    #lang-btn.en .flag-en { display: block; }
+  /* ── PINCODE PAGE ── */
+  .pin-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 380px;
+  }
+  .pin-label {
+    background: var(--lavender);
+    width: 100%;
+    padding: 12px 20px;
+    font-size: clamp(18px, 2.4vw, 24px);
+    font-weight: 400;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+  .pin-display {
+    background: var(--gray-input);
+    width: 100%;
+    height: 48px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 10px;
+  }
+  .pin-dot {
+    width: 16px; height: 16px;
+    background: var(--navy);
+    border-radius: 50%;
+    display: none;
+  }
+  .pin-dot.filled { display: block; }
+  .pin-grid {
+    background: var(--lavender-btn);
+    border-radius: 6px;
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 100%;
+  }
+  .pin-key {
+    background: none;
+    border: none;
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(22px, 2.8vw, 28px);
+    font-weight: 400;
+    cursor: pointer;
+    padding: 12px 0;
+    text-align: center;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+  .pin-key:hover { background: rgba(255,255,255,0.15); }
+  .pin-key.del { font-size: 18px; letter-spacing: 0.05em; }
+  .pin-key.confirm {
+    background: rgba(255,255,255,0.12);
+    font-size: 16px;
+    letter-spacing: 0.08em;
+  }
+  .pin-key.confirm:hover { background: rgba(255,255,255,0.25); }
 
-    .lang-label {
-      font-size: 0.78rem;
-      color: var(--dim);
-      text-align: center;
-      line-height: 1.25;
-      letter-spacing: 0.04em;
-    }
+  /* ── BIRTHDATE PAGE ── */
+  .date-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 400px;
+  }
+  .date-label {
+    background: var(--lavender);
+    width: 100%;
+    padding: 12px 20px;
+    font-size: clamp(18px, 2.4vw, 24px);
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+  .date-inputs {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    align-items: center;
+  }
+  .date-field {
+    background: var(--gray-input);
+    border: none;
+    border-radius: 4px;
+    color: var(--gray-text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(22px, 2.8vw, 28px);
+    text-align: center;
+    padding: 12px 8px;
+    outline: none;
+    font-weight: 500;
+  }
+  .date-field.day, .date-field.month { width: 80px; }
+  .date-field.year { width: 115px; }
+  .date-sep { font-size: 26px; color: var(--lavender-light); }
+  .date-numpad {
+    background: var(--lavender-btn);
+    border-radius: 6px;
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 100%;
+  }
+  .date-key {
+    background: none;
+    border: none;
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(22px, 2.8vw, 26px);
+    cursor: pointer;
+    padding: 10px 0;
+    text-align: center;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+  .date-key:hover { background: rgba(255,255,255,0.15); }
+  .date-key.del { font-size: 16px; }
+  .date-submit {
+    width: 100%;
+    background: var(--lavender);
+    border: none;
+    border-radius: 4px;
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.1em;
+    padding: 18px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-weight: 400;
+  }
+  .date-submit:hover { background: var(--accent); }
 
-    /* ── BACK BUTTON ── */
-    .back-btn {
-      position: absolute;
-      bottom: 0; left: 0;
-      width: 120px; height: 90px;   /* large touch target */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-    }
-    .back-arrow {
-      width: 0; height: 0;
-      border-top:    24px solid transparent;
-      border-bottom: 24px solid transparent;
-      border-right:  40px solid rgba(255,255,255,0.75);
-      transition: border-right-color .15s;
-    }
-    .back-btn:hover .back-arrow { border-right-color: #fff; }
+  /* ── QR PAGE ── */
+  .qr-box {
+    background: var(--gray-input);
+    border-radius: 6px;
+    padding: 32px 48px;
+    font-size: clamp(22px, 2.8vw, 28px);
+    color: var(--gray-text);
+    letter-spacing: 0.06em;
+    line-height: 1.5;
+    max-width: 600px;
+    text-align: left;
+  }
 
-    /* ════════════════════════════════════════
-       SCREEN 1 – SPLASH
-    ════════════════════════════════════════ */
-    #splash {
-      justify-content: center;
-      cursor: pointer;
-      padding: 3rem 3.5rem 90px;
-    }
-    .welcome-box {
-      background: var(--lav);
-      padding: 2rem 2.8rem 2.2rem;
-      display: inline-block;
-      margin-bottom: 3rem;
-      max-width: 600px;
-    }
-    .welcome-box h1 {
-      font-size: clamp(3.2rem, 8vw, 5rem);
-      font-weight: 300;
-      letter-spacing: 0.05em;
-      line-height: 1;
-      margin-bottom: 0.4rem;
-    }
-    .welcome-box p {
-      font-size: clamp(1.2rem, 3vw, 1.7rem);
-      font-weight: 400;
-      letter-spacing: 0.1em;
-    }
-    .click-prompt {
-      font-size: clamp(1.1rem, 2.5vw, 1.5rem);
-      color: var(--dim);
-      letter-spacing: 0.22em;
-    }
+  /* ── DISPENSING PAGE ── */
+  .dispensing-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 36px;
+    padding: 48px 40px;
+  }
+  .dispensing-msg {
+    background: var(--gray-input);
+    border-radius: 6px;
+    padding: 26px 42px;
+    font-size: clamp(24px, 3vw, 30px);
+    color: var(--gray-text);
+    letter-spacing: 0.05em;
+    text-align: center;
+    max-width: 620px;
+  }
+  .dots {
+    display: flex;
+    gap: 20px;
+    margin-top: 12px;
+  }
+  .dot {
+    width: 14px; height: 14px;
+    background: var(--white);
+    border-radius: 50%;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  .dot:nth-child(4) { animation-delay: 0.6s; }
+  .dot:nth-child(5) { animation-delay: 0.8s; }
+  @keyframes pulse {
+    0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
+    40% { opacity: 1; transform: scale(1); }
+  }
 
-    /* ════════════════════════════════════════
-       SCREEN 2 – LOGIN CHOICE
-    ════════════════════════════════════════ */
-    #login-choice {
-      justify-content: center;
-      align-items: center;
-    }
-    .login-row {
-      display: flex;
-      gap: 2.5rem;
-      justify-content: center;
-      flex-wrap: wrap;
-      padding: 2rem;
-    }
-    .login-tile {
-      background: var(--lav);
-      border: none;
-      color: var(--text);
-      font-family: var(--sans);
-      font-size: 1.7rem;
-      font-weight: 600;
-      width: 220px;
-      height: 200px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      line-height: 1.35;
-      padding: 1.2rem;
-      transition: background .2s;
-    }
-    .login-tile:hover { background: var(--lav-h); }
-
-    /* ════════════════════════════════════════
-       SCREEN 3 – BIRTHDAY
-    ════════════════════════════════════════ */
-    #birthday {
-      padding: 1.5rem 2rem 90px;
-      gap: 1rem;
-    }
-    .page-header {
-      background: var(--lav);
-      padding: 1rem 1.8rem;
-      font-size: 1.7rem;
-      font-weight: 400;
-      letter-spacing: 0.05em;
-      margin-bottom: 0.5rem;
-    }
-    .input-display {
-      background: rgba(180,185,230,0.28);
-      border: 1px solid rgba(255,255,255,0.18);
-      padding: 0.7rem 1.2rem;
-      font-size: 2rem;
-      font-weight: 600;
-      letter-spacing: 0.15em;
-      min-height: 3.5rem;
-      max-width: 440px;
-      align-self: flex-start;
-    }
-    .bd-body {
-      display: flex;
-      gap: 2rem;
-      flex: 1;
-      align-items: flex-start;
-    }
-    /* Month grid: 4×3 */
-    .month-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 6px;
-      flex: 1;
-    }
-    .month-btn {
-      background: var(--lav-s);
-      border: 1px solid rgba(255,255,255,0.15);
-      color: var(--text);
-      font-family: var(--sans);
-      font-size: 1.4rem;
-      font-weight: 600;
-      padding: 0.85rem 0.4rem;
-      cursor: pointer;
-      letter-spacing: 0.05em;
-      transition: background .15s;
-    }
-    .month-btn:hover, .month-btn.sel { background: var(--lav-h); }
-    /* Number pad */
-    .numpad {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      width: 240px;
-    }
-    .num-btn {
-      background: transparent;
-      border: none;
-      color: var(--text);
-      font-family: var(--sans);
-      font-size: 2rem;
-      font-weight: 400;
-      padding: 0.6rem 0.4rem;
-      cursor: pointer;
-      text-align: center;
-      transition: color .15s;
-    }
-    .num-btn:hover { color: var(--dim); }
-    .num-btn.wide {
-      grid-column: span 2;
-      background: var(--lav-s);
-      font-size: 1.1rem;
-      letter-spacing: 0.1em;
-      border-radius: 2px;
-    }
-    .num-btn.wide:hover { background: var(--lav-h); }
-
-    /* ════════════════════════════════════════
-       SCREEN 4 – PINCODE
-    ════════════════════════════════════════ */
-    #pincode {
-      justify-content: center;
-      align-items: center;
-      gap: 1.4rem;
-      padding: 2rem 2rem 90px;
-    }
-    .pin-header {
-      background: var(--lav);
-      padding: 1rem 2rem;
-      font-size: 1.7rem;
-      font-weight: 400;
-      letter-spacing: 0.05em;
-      width: 100%;
-      max-width: 480px;
-    }
-    .pin-display {
-      background: rgba(180,185,230,0.28);
-      border: 1px solid rgba(255,255,255,0.18);
-      width: 100%;
-      max-width: 480px;
-      padding: 0.7rem 1.2rem;
-      font-size: 2.4rem;
-      letter-spacing: 0.35em;
-      font-weight: 700;
-      min-height: 4rem;
-    }
-    .pin-numpad {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      width: 100%;
-      max-width: 360px;
-    }
-    .pin-btn {
-      background: var(--lav-s);
-      border: none;
-      color: var(--text);
-      font-family: var(--sans);
-      font-size: 2rem;
-      font-weight: 400;
-      padding: 1rem 0.5rem;
-      cursor: pointer;
-      text-align: center;
-      transition: background .15s;
-      letter-spacing: 0.05em;
-    }
-    .pin-btn:hover { background: var(--lav-h); }
-    .pin-btn.del {
-      font-size: 1.1rem;
-      letter-spacing: 0.05em;
-      background: var(--lav-s);
-    }
-    .pin-btn.ok {
-      font-size: 1.3rem;
-      font-weight: 700;
-      background: rgba(110,200,160,0.35);
-    }
-    .pin-btn.ok:hover { background: rgba(110,200,160,0.55); }
-
-    /* ── TOAST ── */
-    #toast {
-      position: fixed;
-      bottom: 1.5rem; left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: var(--lav);
-      border: 1px solid rgba(255,255,255,0.2);
-      font-size: 1.1rem; letter-spacing: 0.1em;
-      padding: 0.8rem 1.8rem;
-      transition: transform .3s cubic-bezier(.34,1.56,.64,1);
-      z-index: 200; white-space: nowrap;
-    }
-    #toast.show { transform: translateX(-50%) translateY(0); }
-    #toast.ok  { border-color: rgba(110,255,196,.5); color:#6effc4; }
-    #toast.err { border-color: rgba(255,100,100,.4); color:#ff9999; }
-  </style>
+  /* ── END PAGE ── */
+  .end-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    padding: 48px 40px;
+  }
+  .end-msg {
+    background: var(--gray-input);
+    border-radius: 6px;
+    padding: 32px 48px;
+    font-size: clamp(20px, 2.8vw, 28px);
+    color: var(--gray-text);
+    letter-spacing: 0.04em;
+    text-align: center;
+    max-width: 620px;
+    line-height: 1.5;
+    font-weight: 400;
+  }
+  .end-farewell {
+    background: var(--gray-input);
+    border-radius: 6px;
+    padding: 32px 48px;
+    font-size: clamp(22px, 3.2vw, 32px);
+    color: var(--gray-text);
+    letter-spacing: 0.05em;
+    text-align: center;
+    max-width: 620px;
+    line-height: 1.6;
+    font-weight: 400;
+  }
+</style>
 </head>
 <body>
 
-<!-- ── Language switcher ── -->
-<div id="lang-btn" onclick="toggleLang()">
-  <div class="flag-nl">
-    <div class="r r1"></div>
-    <div class="r r2"></div>
-    <div class="r r3"></div>
-  </div>
-  <svg class="flag-en" viewBox="0 0 68 45" xmlns="http://www.w3.org/2000/svg">
-    <rect width="68" height="45" fill="#012169"/>
-    <path d="M0,0 L68,45 M68,0 L0,45" stroke="#fff" stroke-width="7"/>
-    <path d="M0,0 L68,45 M68,0 L0,45" stroke="#C8102E" stroke-width="4.5"/>
-    <path d="M34,0 V45 M0,22.5 H68" stroke="#fff" stroke-width="11"/>
-    <path d="M34,0 V45 M0,22.5 H68" stroke="#C8102E" stroke-width="7"/>
-  </svg>
-  <div class="lang-label" id="lang-label">klik voor<br>engels</div>
-</div>
-
-<!-- ══════════════════════════════════
-     SCREEN 1 – SPLASH
-══════════════════════════════════ -->
-<div class="screen active" id="splash" onclick="goTo('login-choice')">
-  <div class="welcome-box">
-    <h1 id="s-welcome">welkom</h1>
-    <p id="s-sub">bij de medicijnkluis</p>
-  </div>
-  <div class="click-prompt" id="s-prompt">klik om door te gaan</div>
-</div>
-
-<!-- ══════════════════════════════════
-     SCREEN 2 – LOGIN CHOICE
-══════════════════════════════════ -->
-<div class="screen" id="login-choice">
-  <div class="login-row" style="flex:1;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:2.5rem;padding:2rem;">
-    <button class="login-tile" id="btn-handmatig" onclick="goTo('birthday')">inloggen<br>handmatig</button>
-    <button class="login-tile" id="btn-qr"        onclick="goTo('pincode')">inloggen<br>Qr-code</button>
-  </div>
-  <div class="back-btn" onclick="goTo('splash')"><div class="back-arrow"></div></div>
-</div>
-
-<!-- ══════════════════════════════════
-     SCREEN 3 – BIRTHDAY
-══════════════════════════════════ -->
-<div class="screen" id="birthday">
-  <div class="page-header" id="bd-header">Vul uw geboortedatum in</div>
-  <div class="input-display" id="bd-display">&nbsp;</div>
-
-  <div class="bd-body">
-    <!-- Month grid -->
-    <div class="month-grid" id="month-grid">
-      <!-- filled by JS -->
-    </div>
-
-    <!-- Number pad (day digits) -->
-    <div class="numpad">
-      <button class="num-btn" onclick="bdNum(1)">1</button>
-      <button class="num-btn" onclick="bdNum(2)">2</button>
-      <button class="num-btn" onclick="bdNum(3)">3</button>
-      <button class="num-btn" onclick="bdNum(4)">4</button>
-      <button class="num-btn" onclick="bdNum(5)">5</button>
-      <button class="num-btn" onclick="bdNum(6)">6</button>
-      <button class="num-btn" onclick="bdNum(7)">7</button>
-      <button class="num-btn" onclick="bdNum(8)">8</button>
-      <button class="num-btn" onclick="bdNum(9)">9</button>
-      <button class="num-btn wide" id="bd-del"   onclick="bdDel()">wis</button>
-      <button class="num-btn" onclick="bdNum(0)">0</button>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PAGE: WELCOME -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="page-welcome" class="page active">
+  <div class="inner-page" onclick="goTo('page-login')">
+    <div style="flex:1; display:flex; flex-direction:column; justify-content:center; padding:60px 80px; gap:40px;">
+      <div class="welcome-hero">
+        <h1 id="w-title">Welkom</h1>
+        <p id="w-sub">bij de medicijnkluis</p>
+      </div>
+      <div class="welcome-proceed" id="w-proceed">
+        klik om door te gaan
+      </div>
     </div>
   </div>
 
-  <div class="back-btn" onclick="goTo('login-choice')"><div class="back-arrow"></div></div>
-</div>
-
-<!-- ══════════════════════════════════
-     SCREEN 4 – PINCODE
-══════════════════════════════════ -->
-<div class="screen" id="pincode">
-  <div class="pin-header" id="pin-header">Vul uw pincode in</div>
-  <div class="pin-display" id="pin-display">&nbsp;</div>
-
-  <div class="pin-numpad">
-    <button class="pin-btn" onclick="pinNum(1)">1</button>
-    <button class="pin-btn" onclick="pinNum(2)">2</button>
-    <button class="pin-btn" onclick="pinNum(3)">3</button>
-    <button class="pin-btn" onclick="pinNum(4)">4</button>
-    <button class="pin-btn" onclick="pinNum(5)">5</button>
-    <button class="pin-btn" onclick="pinNum(6)">6</button>
-    <button class="pin-btn" onclick="pinNum(7)">7</button>
-    <button class="pin-btn" onclick="pinNum(8)">8</button>
-    <button class="pin-btn" onclick="pinNum(9)">9</button>
-    <button class="pin-btn del" id="pin-del" onclick="pinDel()">wis</button>
-    <button class="pin-btn" onclick="pinNum(0)">0</button>
-    <button class="pin-btn ok"  onclick="pinOk()">OK</button>
+  <!-- Language switcher -->
+  <div class="lang-switch" onclick="toggleLang()">
+    <img id="flag-display" src="https://img.icons8.com/emoji/48/netherlands-emoji.png" alt="netherlands-emoji">
+    <div class="lang-label" id="lang-label">click here<br>for english</div>
   </div>
-
-  <div class="back-btn" onclick="goTo('login-choice')"><div class="back-arrow"></div></div>
 </div>
 
-<div id="toast"></div>
+<!-- PAGE: END -->
+<div id="page-end" class="page">
+  <div class="inner-page">
+    <div class="page-header" id="end-header"></div>
+    <div class="page-body end-body">
+      <div class="end-msg" id="end-msg"></div>
+      <div class="end-farewell" id="end-farewell"></div>
+    </div>
+  </div>
+  <div class="back-btn" onclick="goTo('page-welcome')"></div>
+</div>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PAGE: LOGIN CHOICE (Manual / QR) -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="page-login" class="page">
+  <div class="inner-page">
+    <div class="page-header" id="login-header">Aanmelden</div>
+    <div class="page-body">
+      <button class="option-btn" onclick="goTo('page-manual')" id="btn-manual">inloggen<br>handmatig</button>
+      <button class="option-btn" onclick="goTo('page-qr')" id="btn-qr">inloggen<br>Qr-code</button>
+    </div>
+  </div>
+  <div class="back-btn" onclick="goTo('page-welcome')"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PAGE: MANUAL LOGIN CHOICE (Pin / Birthdate) -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="page-manual" class="page">
+  <div class="inner-page">
+    <div class="page-header" id="manual-header">Handmatig inloggen</div>
+    <div class="page-body">
+      <button class="option-btn" onclick="goTo('page-pin')" id="btn-pin">inloggen<br>met<br>pincode</button>
+      <button class="option-btn" onclick="goTo('page-date')" id="btn-date">inloggen<br>met<br>geboortedatum</button>
+    </div>
+  </div>
+  <div class="back-btn" onclick="goTo('page-login')"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PAGE: PINCODE -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="page-pin" class="page">
+  <div class="inner-page">
+    <div class="page-header" id="pin-header">Pincode invoeren</div>
+    <div class="page-body">
+      <div class="pin-wrapper">
+        <div class="pin-label" id="pin-label">Vul uw pincode in</div>
+        <div class="pin-display" id="pin-display"></div>
+        <div class="pin-grid">
+          <button class="pin-key" onclick="pinKey('1')">1</button>
+          <button class="pin-key" onclick="pinKey('2')">2</button>
+          <button class="pin-key" onclick="pinKey('3')">3</button>
+          <button class="pin-key" onclick="pinKey('4')">4</button>
+          <button class="pin-key" onclick="pinKey('5')">5</button>
+          <button class="pin-key" onclick="pinKey('6')">6</button>
+          <button class="pin-key" onclick="pinKey('7')">7</button>
+          <button class="pin-key" onclick="pinKey('8')">8</button>
+          <button class="pin-key" onclick="pinKey('9')">9</button>
+          <button class="pin-key del" onclick="pinDel()" id="pin-del-btn">⌫</button>
+          <button class="pin-key" onclick="pinKey('0')">0</button>
+          <button class="pin-key confirm" onclick="pinConfirm()" id="pin-ok-btn">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="back-btn" onclick="goTo('page-manual'); pinReset()"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PAGE: BIRTHDATE -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="page-date" class="page">
+  <div class="inner-page">
+    <div class="page-header" id="date-header">Geboortedatum invoeren</div>
+    <div class="page-body">
+      <div class="date-wrapper">
+        <div class="date-label" id="date-label">Vul uw geboortedatum in</div>
+        <div class="date-inputs">
+          <input class="date-field day" id="date-dd" maxlength="2" placeholder="DD" readonly>
+          <span class="date-sep">/</span>
+          <input class="date-field month" id="date-mm" maxlength="2" placeholder="MM" readonly>
+          <span class="date-sep">/</span>
+          <input class="date-field year" id="date-yyyy" maxlength="4" placeholder="YYYY" readonly>
+        </div>
+        <div class="date-numpad">
+          <button class="date-key" onclick="dateKey('1')">1</button>
+          <button class="date-key" onclick="dateKey('2')">2</button>
+          <button class="date-key" onclick="dateKey('3')">3</button>
+          <button class="date-key" onclick="dateKey('4')">4</button>
+          <button class="date-key" onclick="dateKey('5')">5</button>
+          <button class="date-key" onclick="dateKey('6')">6</button>
+          <button class="date-key" onclick="dateKey('7')">7</button>
+          <button class="date-key" onclick="dateKey('8')">8</button>
+          <button class="date-key" onclick="dateKey('9')">9</button>
+          <button class="date-key del" onclick="dateDel()">⌫</button>
+          <button class="date-key" onclick="dateKey('0')">0</button>
+          <button class="date-key confirm" onclick="dateConfirm()" style="font-size:14px;letter-spacing:0.08em;background:rgba(255,255,255,0.12)">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="back-btn" onclick="goTo('page-manual'); dateReset()"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PAGE: QR CODE -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="page-qr" class="page">
+  <div class="inner-page">
+    <div class="page-header" id="qr-header">QR-code scannen</div>
+    <div class="page-body">
+      <div class="qr-box" id="qr-msg">Plaats uw QR-code voor de scanner</div>
+    </div>
+  </div>
+  <div class="back-btn" onclick="goTo('page-login')"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PAGE: DISPENSING / INCOMING MEDICINE -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="page-dispensing" class="page">
+  <div class="inner-page">
+    <div class="page-header" id="disp-header">Medicijnen komen</div>
+    <div class="page-body dispensing-body">
+      <div class="dispensing-msg" id="disp-msg">Wacht tot de deur opengaat</div>
+      <div class="dots">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        <div class="dot"></div><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+  <div class="back-btn" onclick="goTo('page-welcome')"></div>
+</div>
 
 <script>
-  // ── State ──────────────────────────────────────────
-  let lang = 'nl';
-  let bdMonth = null;
-  let bdDay   = '';
-  let pinVal  = '';
+// ── STATE ──
+let lang = 'nl';
+let pinValue = '';
+let dateBuffer = '';   // flat string DDMMYYYY
 
-  // ── Strings ────────────────────────────────────────
-  const T = {
-    nl: {
-      langLabel:   'klik voor\n engels',
-      welcome:     'welkom',
-      sub:         'bij de medicijnkluis',
-      prompt:      'klik om door te gaan',
-      handmatig:   'inloggen\nhandmatig',
-      qr:          'inloggen\nQr-code',
-      bdHeader:    'Vul uw geboortedatum in',
-      pinHeader:   'Vul uw pincode in',
-      del:         'wis',
-      months:      ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-    },
-    en: {
-      langLabel:   'click for\ndutch',
-      welcome:     'welcome',
-      sub:         'to the medicine cabinet',
-      prompt:      'click to continue',
-      handmatig:   'log in\nmanually',
-      qr:          'log in\nQr-code',
-      bdHeader:    'Enter your date of birth',
-      pinHeader:   'Enter your pin code',
-      del:         'del',
-      months:      ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-    }
-  };
+// ── TRANSLATIONS ──
+const T = {
+  nl: {
+    wTitle: 'Welkom',
+    wSub: 'bij de medicijnkluis',
+    wProceed: 'klik om door te gaan',
+    flagLabel: 'click here for\nenglish',
+    loginHeader: 'Aanmelden',
+    btnManual: 'inloggen\nhandmatig',
+    btnQr: 'inloggen\nQr-code',
+    manualHeader: 'Handmatig inloggen',
+    btnPin: 'inloggen met\npincode',
+    btnDate: 'inloggen met\ngeboortedatum',
+    pinHeader: 'Pincode invoeren',
+    pinLabel: 'Vul uw pincode in',
+    dateHeader: 'Geboortedatum invoeren',
+    dateLabel: 'Vul uw geboortedatum in',
+    qrHeader: 'QR-code scannen',
+    qrMsg: 'Plaats uw QR-code voor de scanner',
+    dispHeader: 'Medicijnen komen',
+    dispMsg: 'Wacht tot de deur opengaat',
+  },
+  en: {
+    wTitle: 'Welcome',
+    wSub: 'to the medicine vault',
+    wProceed: 'click to proceed',
+    flagLabel: 'klik hier voor\nnederlands',
+    loginHeader: 'Log in',
+    btnManual: 'login\nmanually',
+    btnQr: 'login\nQR code',
+    manualHeader: 'Manual login',
+    btnPin: 'login with\npincode',
+    btnDate: 'login with\ndate of birth',
+    pinHeader: 'Enter pincode',
+    pinLabel: 'Enter your pincode',
+    dateHeader: 'Enter date of birth',
+    dateLabel: 'Enter your date of birth',
+    qrHeader: 'QR code scan',
+    qrMsg: 'Place your QR code in front of the scanner',
+    dispHeader: 'Incoming medicine',
+    dispMsg: 'Wait until the door opens',
+  }
+};
 
-  function t(k) { return T[lang][k]; }
+function applyLang() {
+  const t = T[lang];
+  document.getElementById('w-title').textContent = t.wTitle;
+  document.getElementById('w-sub').textContent = t.wSub;
+  document.getElementById('w-proceed').textContent = t.wProceed;
+  document.getElementById('lang-label').innerHTML = t.flagLabel.replace('\n','<br>');
+  document.getElementById('login-header').textContent = t.loginHeader;
+  document.getElementById('btn-manual').innerHTML = t.btnManual.replace(/\n/g,'<br>');
+  document.getElementById('btn-qr').innerHTML = t.btnQr.replace(/\n/g,'<br>');
+  document.getElementById('manual-header').textContent = t.manualHeader;
+  document.getElementById('btn-pin').innerHTML = t.btnPin.replace(/\n/g,'<br>');
+  document.getElementById('btn-date').innerHTML = t.btnDate.replace(/\n/g,'<br>');
+  document.getElementById('pin-header').textContent = t.pinHeader;
+  document.getElementById('pin-label').textContent = t.pinLabel;
+  document.getElementById('date-header').textContent = t.dateHeader;
+  document.getElementById('date-label').textContent = t.dateLabel;
+  document.getElementById('qr-header').textContent = t.qrHeader;
+  document.getElementById('qr-msg').textContent = t.qrMsg;
+  document.getElementById('disp-header').textContent = t.dispHeader;
+  document.getElementById('disp-msg').textContent = t.dispMsg;
 
-  // ── Navigation ─────────────────────────────────────
-  function goTo(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    // reset state when entering screens
-    if (id === 'birthday') { bdMonth = null; bdDay = ''; updateBdDisplay(); buildMonthGrid(); }
-    if (id === 'pincode')  { pinVal = ''; updatePinDisplay(); }
+  // Update flag
+  const fd = document.getElementById('flag-display');
+  if (lang === 'nl') {
+    fd.src = 'https://img.icons8.com/emoji/48/netherlands-emoji.png';
+  } else {
+    fd.src = 'https://img.icons8.com/emoji/48/united-kingdom-emoji.png';
   }
 
-  // ── Language ───────────────────────────────────────
-  function toggleLang() {
-    lang = lang === 'nl' ? 'en' : 'nl';
-    const btn = document.getElementById('lang-btn');
-    btn.classList.toggle('en', lang === 'en');
-    applyStrings();
+  // End page texts (language dependent)
+  const endHeader = document.getElementById('end-header');
+  const endMsg = document.getElementById('end-msg');
+  const endFarewell = document.getElementById('end-farewell');
+  if (endHeader) {
+    endHeader.textContent = (lang === 'nl') ? 'Bedankt voor uw komst' : 'Thank you for visiting';
   }
-
-  function applyStrings() {
-    const s = T[lang];
-    document.getElementById('lang-label').innerHTML    = s.langLabel.replace('\n','<br>');
-    document.getElementById('s-welcome').textContent   = s.welcome;
-    document.getElementById('s-sub').textContent       = s.sub;
-    document.getElementById('s-prompt').textContent    = s.prompt;
-    document.getElementById('btn-handmatig').innerHTML = s.handmatig.replace('\n','<br>');
-    document.getElementById('btn-qr').innerHTML        = s.qr.replace('\n','<br>');
-    document.getElementById('bd-header').textContent   = s.bdHeader;
-    document.getElementById('pin-header').textContent  = s.pinHeader;
-    document.getElementById('bd-del').textContent      = s.del;
-    document.getElementById('pin-del').textContent     = s.del;
-    buildMonthGrid();
-    updateBdDisplay();
-    updatePinDisplay();
+  if (endMsg) {
+    endMsg.textContent = (lang === 'nl') ? 'Zorg dat u al uw medicijnen uit het vak heeft gehaald!' : 'Make sure to take all your medicine from the compartment!';
   }
-
-  // ── Birthday logic ─────────────────────────────────
-  function buildMonthGrid() {
-    const grid = document.getElementById('month-grid');
-    grid.innerHTML = '';
-    T[lang].months.forEach((m, i) => {
-      const btn = document.createElement('button');
-      btn.className = 'month-btn' + (bdMonth === i ? ' sel' : '');
-      btn.textContent = m;
-      btn.onclick = () => { bdMonth = i; buildMonthGrid(); updateBdDisplay(); };
-      grid.appendChild(btn);
-    });
+  if (endFarewell) {
+    endFarewell.textContent = (lang === 'nl') ? 'Tot ziens!' : 'Goodbye!';
   }
+}
 
-  function bdNum(n) {
-    if (bdDay.length < 2) { bdDay += n; updateBdDisplay(); }
+function toggleLang() {
+  lang = lang === 'nl' ? 'en' : 'nl';
+  applyLang();
+}
+
+// ── NAVIGATION ──
+let autoAdvanceTimer = null;
+
+function goTo(id) {
+  if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 'page-dispensing') {
+    autoAdvanceTimer = setTimeout(() => { goTo('page-end'); }, 10000);
   }
+}
 
-  function bdDel() {
-    if (bdDay.length > 0) { bdDay = bdDay.slice(0,-1); }
-    else { bdMonth = null; }
-    buildMonthGrid();
-    updateBdDisplay();
+// ── PIN LOGIC ──
+function pinRender() {
+  const d = document.getElementById('pin-display');
+  d.innerHTML = '';
+  for (let i = 0; i < 6; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'pin-dot' + (i < pinValue.length ? ' filled' : '');
+    d.appendChild(dot);
   }
+}
 
-  function updateBdDisplay() {
-    const el = document.getElementById('bd-display');
-    const monthStr = bdMonth !== null ? T[lang].months[bdMonth] : '';
-    const dayStr   = bdDay !== '' ? bdDay : '';
-    const val = [monthStr, dayStr].filter(Boolean).join('  ');
-    el.textContent = val || '\u00a0';
+function pinKey(k) {
+  if (pinValue.length < 6) {
+    pinValue += k;
+    pinRender();
   }
+}
 
-  // ── Pincode logic ───────────────────────────────────
-  function pinNum(n) {
-    if (pinVal.length < 6) { pinVal += n; updatePinDisplay(); }
+function pinDel() {
+  pinValue = pinValue.slice(0, -1);
+  pinRender();
+}
+
+function pinConfirm() {
+  if (pinValue.length > 0) {
+    goTo('page-dispensing');
+    pinReset();
   }
+}
 
-  function pinDel() {
-    pinVal = pinVal.slice(0,-1);
-    updatePinDisplay();
+function pinReset() {
+  pinValue = '';
+  pinRender();
+}
+
+pinRender();
+
+// ── DATE LOGIC ──
+function dateFields() {
+  const dd = dateBuffer.slice(0, 2).padEnd(2, '_');
+  const mm = dateBuffer.slice(2, 4).padEnd(2, '_');
+  const yyyy = dateBuffer.slice(4, 8).padEnd(4, '_');
+  document.getElementById('date-dd').value = dd === '__' ? '' : dd.replace(/_/g, '');
+  document.getElementById('date-mm').value = mm === '__' ? '' : mm.replace(/_/g, '');
+  document.getElementById('date-yyyy').value = yyyy === '____' ? '' : yyyy.replace(/_/g, '');
+  document.getElementById('date-dd').placeholder = 'DD';
+  document.getElementById('date-mm').placeholder = 'MM';
+  document.getElementById('date-yyyy').placeholder = 'YYYY';
+}
+
+function dateKey(k) {
+  if (dateBuffer.length < 8) {
+    dateBuffer += k;
+    dateFields();
   }
+}
 
-  function pinOk() {
-    if (pinVal.length === 0) return;
-    // Send to backend: POST /api/pin  { pin: "1234" }
-    fetch('/api/pin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin: pinVal })
-    })
-    .then(r => r.json())
-    .then(d => {
-      if (d.ok) toast(lang === 'nl' ? 'Toegang verleend' : 'Access granted', 'ok');
-      else      toast(lang === 'nl' ? 'Onjuiste pincode' : 'Incorrect pin', 'err');
-      pinVal = ''; updatePinDisplay();
-    })
-    .catch(() => {
-      // no backend connected yet – just show demo response
-      toast(lang === 'nl' ? 'Demo: pincode ontvangen' : 'Demo: pin received', 'ok');
-      pinVal = ''; updatePinDisplay();
-    });
+function dateDel() {
+  dateBuffer = dateBuffer.slice(0, -1);
+  dateFields();
+}
+
+function dateConfirm() {
+  if (dateBuffer.length === 8) {
+    goTo('page-dispensing');
+    dateReset();
   }
+}
 
-  function updatePinDisplay() {
-    const el = document.getElementById('pin-display');
-    el.textContent = pinVal.length ? '● '.repeat(pinVal.length).trim() : '\u00a0';
-  }
+function dateReset() {
+  dateBuffer = '';
+  dateFields();
+}
 
-  // ── Toast ───────────────────────────────────────────
-  let toastTimer;
-  function toast(msg, type='') {
-    const el = document.getElementById('toast');
-    el.textContent = msg;
-    el.className = 'show ' + type;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.className = '', 2800);
-  }
+// Simulate QR scan after 3 seconds on QR page
+document.getElementById('page-qr').addEventListener('click', function() {
+  goTo('page-dispensing');
+});
 
-  // ── Init ────────────────────────────────────────────
-  buildMonthGrid();
+applyLang();
 </script>
 </body>
 </html>
