@@ -3,6 +3,19 @@ let lang = 'nl';
 let pinValue = '';
 let dateBuffer = '';   // flat string DDMMYYYY
 
+// ── DISPENSING TIMER ──
+const DISPENSING_DURATION = 10; // seconds
+let dispensingTimeLeft = DISPENSING_DURATION;
+let dispensingInterval = null;
+const TIMER_CIRCUMFERENCE = 2 * Math.PI * 54; // ~339.292
+
+// ── INACTIVITY TIMEOUT ──
+const INACTIVITY_LIMIT = 60 * 1000; // 30 seconds
+const TIMEOUT_COUNTDOWN = 30; // seconds
+let inactivityTimer = null;
+let timeoutModalTimer = null;
+let timeoutCountdownValue = TIMEOUT_COUNTDOWN;
+
 // ── TRANSLATIONS ──
 const T = {
   nl: {
@@ -24,6 +37,13 @@ const T = {
     qrMsg: 'Plaats uw QR-code voor de scanner',
     dispHeader: 'Medicijnen komen',
     dispMsg: 'Wacht tot de deur opengaat',
+    dispTimerLabel: 'seconden',
+    endHeader: 'Bedankt voor uw komst',
+    endMsg: 'Zorg dat u al uw medicijnen uit het vak heeft gehaald!',
+    endFarewell: 'Tot ziens!',
+    btnPrint: 'Bijsluiter printen',
+    timeoutMessage: 'Systeem wordt reset door inactiviteit.',
+    timeoutSubtitle: 'Klik ergens om te heractiveren',
   },
   en: {
     wTitle: 'Welcome',
@@ -44,6 +64,13 @@ const T = {
     qrMsg: 'Place your QR code in front of the scanner',
     dispHeader: 'Incoming medicine',
     dispMsg: 'Wait until the door opens',
+    dispTimerLabel: 'seconds',
+    endHeader: 'Thank you for visiting',
+    endMsg: 'Make sure to take all your medicine from the compartment!',
+    endFarewell: 'Goodbye!',
+    btnPrint: 'Print leaflet',
+    timeoutMessage: 'Process will be stopped due to inactivity.',
+    timeoutSubtitle: 'Click anywhere to cancel',
   }
 };
 
@@ -68,6 +95,10 @@ function applyLang() {
   document.getElementById('disp-header').textContent = t.dispHeader;
   document.getElementById('disp-msg').textContent = t.dispMsg;
 
+  // Timer label
+  const timerLabel = document.getElementById('disp-timer-label');
+  if (timerLabel) timerLabel.textContent = t.dispTimerLabel;
+
   // Update flag
   const fd = document.getElementById('flag-display');
   if (lang === 'nl') {
@@ -80,15 +111,25 @@ function applyLang() {
   const endHeader = document.getElementById('end-header');
   const endMsg = document.getElementById('end-msg');
   const endFarewell = document.getElementById('end-farewell');
+  const btnPrint = document.getElementById('btn-print');
   if (endHeader) {
-    endHeader.textContent = (lang === 'nl') ? 'Bedankt voor uw komst' : 'Thank you for visiting';
+    endHeader.textContent = t.endHeader;
   }
   if (endMsg) {
-    endMsg.textContent = (lang === 'nl') ? 'Zorg dat u al uw medicijnen uit het vak heeft gehaald!' : 'Make sure to take all your medicine from the compartment!';
+    endMsg.textContent = t.endMsg;
   }
   if (endFarewell) {
-    endFarewell.textContent = (lang === 'nl') ? 'Tot ziens!' : 'Goodbye!';
+    endFarewell.textContent = t.endFarewell;
   }
+  if (btnPrint) {
+    btnPrint.textContent = t.btnPrint;
+  }
+
+  // Timeout modal texts
+  const timeoutMsgEl = document.getElementById('timeout-message');
+  const timeoutSubEl = document.getElementById('timeout-subtitle');
+  if (timeoutMsgEl) timeoutMsgEl.textContent = t.timeoutMessage;
+  if (timeoutSubEl) timeoutSubEl.textContent = t.timeoutSubtitle;
 }
 
 function toggleLang() {
@@ -100,11 +141,18 @@ function toggleLang() {
 let autoAdvanceTimer = null;
 
 function goTo(id) {
+  resetInactivityTimer();
   if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+  if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
+
+  // Hide timeout modal when navigating
+  hideTimeoutModal();
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+
   if (id === 'page-dispensing') {
-    autoAdvanceTimer = setTimeout(() => { goTo('page-end'); }, 10000);
+    startDispensingTimer();
   }
 }
 
@@ -184,7 +232,135 @@ function dateReset() {
 
 // Simulate QR scan after 3 seconds on QR page
 document.getElementById('page-qr').addEventListener('click', function() {
+  resetInactivityTimer();
   goTo('page-dispensing');
 });
 
+// ── DISPENSING TIMER ──
+function startDispensingTimer() {
+  dispensingTimeLeft = DISPENSING_DURATION;
+  updateTimerDisplay();
+
+  dispensingInterval = setInterval(() => {
+    dispensingTimeLeft--;
+    updateTimerDisplay();
+
+    if (dispensingTimeLeft <= 0) {
+      clearInterval(dispensingInterval);
+      dispensingInterval = null;
+      goTo('page-end');
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const timerText = document.getElementById('disp-timer');
+  const timerProgress = document.querySelector('.timer-progress');
+
+  if (timerText) {
+    timerText.textContent = dispensingTimeLeft;
+  }
+
+  if (timerProgress) {
+    const progress = 1 - (dispensingTimeLeft / DISPENSING_DURATION);
+    const offset = TIMER_CIRCUMFERENCE * (1 - progress);
+    timerProgress.style.strokeDasharray = TIMER_CIRCUMFERENCE;
+    timerProgress.style.strokeDashoffset = offset;
+  }
+}
+
+// ── STOP PROCESS ──
+function stopProcess() {
+  resetInactivityTimer();
+
+  // Clear all timers
+  if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+  if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
+  hideTimeoutModal();
+
+  // Reset state
+  pinReset();
+  dateReset();
+
+  // Go to welcome page
+  goTo('page-welcome');
+}
+
+// ── PRINT LEAFLET ──
+function printLeaflet() {
+  resetInactivityTimer();
+  // TODO: Implement print functionality
+  console.log('Bijsluiter printen - TODO');
+}
+
+// ── INACTIVITY TIMEOUT ──
+function resetInactivityTimer() {
+  if (inactivityTimer) {
+    clearTimeout(inactivityTimer);
+  }
+
+  // Hide timeout modal if visible
+  hideTimeoutModal();
+
+  // Check if we're on admin page (no timeout for admin)
+  const activePage = document.querySelector('.page.active');
+  if (activePage && activePage.id === 'page-admin') {
+    return;
+  }
+
+  // Start inactivity timer
+  inactivityTimer = setTimeout(showTimeoutModal, INACTIVITY_LIMIT);
+}
+
+function showTimeoutModal() {
+  const modal = document.getElementById('timeout-modal');
+  if (!modal) return;
+
+  modal.classList.add('show');
+  timeoutCountdownValue = TIMEOUT_COUNTDOWN;
+  updateTimeoutDisplay();
+
+  // Start countdown
+  timeoutModalTimer = setInterval(() => {
+    timeoutCountdownValue--;
+    updateTimeoutDisplay();
+
+    if (timeoutCountdownValue <= 0) {
+      hideTimeoutModal();
+      stopProcess();
+    }
+  }, 1000);
+}
+
+function hideTimeoutModal() {
+  const modal = document.getElementById('timeout-modal');
+  if (modal) {
+    modal.classList.remove('show');
+  }
+  if (timeoutModalTimer) {
+    clearInterval(timeoutModalTimer);
+    timeoutModalTimer = null;
+  }
+}
+
+function dismissTimeout() {
+  if (timeoutCountdownValue > 0) {
+    hideTimeoutModal();
+    resetInactivityTimer();
+  }
+}
+
+function updateTimeoutDisplay() {
+  const countdownEl = document.getElementById('timeout-countdown');
+  if (countdownEl) {
+    countdownEl.textContent = timeoutCountdownValue;
+  }
+}
+
+// ── GLOBAL ACTIVITY LISTENER ──
+document.addEventListener('click', resetInactivityTimer);
+document.addEventListener('touchstart', resetInactivityTimer);
+
+// ── INIT ──
 applyLang();
+resetInactivityTimer();

@@ -28,6 +28,21 @@
     <img id="flag-display" src="https://img.icons8.com/emoji/48/netherlands-emoji.png" alt="netherlands-emoji">
     <div class="lang-label" id="lang-label">click here<br>for english</div>
   </div>
+  <div class="bottom-btns">
+    <div class="stop-btn" onclick="stopProcess()" title="Stoppen">✕</div>
+  </div>
+</div>
+
+<!-- TIMEOUT MODAL -->
+<div id="timeout-modal" class="timeout-modal">
+  <div class="timeout-overlay" onclick="dismissTimeout()">
+    <div class="timeout-content">
+      <div class="timeout-icon">⏱</div>
+      <div class="timeout-message" id="timeout-message">Proces wordt gestopt i.v.m. inactiviteit.</div>
+      <div class="timeout-countdown" id="timeout-countdown">30</div>
+      <div class="timeout-subtitle" id="timeout-subtitle">Klik ergens om te heractiveren</div>
+    </div>
+  </div>
 </div>
 
 <!-- PAGE: END -->
@@ -37,9 +52,13 @@
     <div class="page-body end-body">
       <div class="end-msg" id="end-msg"></div>
       <div class="end-farewell" id="end-farewell"></div>
+      <button class="print-btn" id="btn-print" onclick="printLeaflet()">Bijsluiter printen</button>
     </div>
   </div>
-  <div class="back-btn" onclick="goTo('page-welcome')"></div>
+  <div class="bottom-btns">
+    <div class="stop-btn" onclick="stopProcess()" id="end-stop-btn" title="Stoppen">✕</div>
+    <div class="back-btn" onclick="goTo('page-welcome')"></div>
+  </div>
 </div>
 
 <div id="page-login" class="page">
@@ -50,7 +69,10 @@
       <button class="option-btn" onclick="goTo('page-qr')" id="btn-qr">inloggen<br>Qr-code</button>
     </div>
   </div>
-  <div class="back-btn" onclick="goTo('page-welcome')"></div>
+  <div class="bottom-btns">
+    <div class="stop-btn" onclick="stopProcess()" title="Stoppen">✕</div>
+    <div class="back-btn" onclick="goTo('page-welcome')"></div>
+  </div>
 </div>
 
 <div id="page-manual" class="page">
@@ -61,7 +83,10 @@
       <button class="option-btn" onclick="goTo('page-date')" id="btn-date">inloggen<br>met<br>geboortedatum</button>
     </div>
   </div>
-  <div class="back-btn" onclick="goTo('page-login')"></div>
+  <div class="bottom-btns">
+    <div class="stop-btn" onclick="stopProcess()" title="Stoppen">✕</div>
+    <div class="back-btn" onclick="goTo('page-login')"></div>
+  </div>
 </div>
 
 <div id="page-pin" class="page">
@@ -88,7 +113,10 @@
       </div>
     </div>
   </div>
-  <div class="back-btn" onclick="goTo('page-manual'); pinReset()"></div>
+  <div class="bottom-btns">
+    <div class="stop-btn" onclick="stopProcess()" title="Stoppen">✕</div>
+    <div class="back-btn" onclick="goTo('page-manual'); pinReset()"></div>
+  </div>
 </div>
 
 <div id="page-date" class="page">
@@ -121,7 +149,10 @@
       </div>
     </div>
   </div>
-  <div class="back-btn" onclick="goTo('page-manual'); dateReset()"></div>
+  <div class="bottom-btns">
+    <div class="stop-btn" onclick="stopProcess()" title="Stoppen">✕</div>
+    <div class="back-btn" onclick="goTo('page-manual'); dateReset()"></div>
+  </div>
 </div>
 
 <div id="page-qr" class="page">
@@ -131,7 +162,10 @@
       <div class="qr-box" id="qr-msg">Plaats uw QR-code voor de scanner</div>
     </div>
   </div>
-  <div class="back-btn" onclick="goTo('page-login')"></div>
+  <div class="bottom-btns">
+    <div class="stop-btn" onclick="stopProcess()" title="Stoppen">✕</div>
+    <div class="back-btn" onclick="goTo('page-login')"></div>
+  </div>
 </div>
 
 <div id="page-dispensing" class="page">
@@ -139,13 +173,26 @@
     <div class="page-header" id="disp-header">Medicijnen komen</div>
     <div class="page-body dispensing-body">
       <div class="dispensing-msg" id="disp-msg">Wacht tot de deur opengaat</div>
+      <div class="dispensing-timer">
+        <div class="timer-ring">
+          <svg class="timer-svg" viewBox="0 0 120 120">
+            <circle class="timer-bg" cx="60" cy="60" r="54"></circle>
+            <circle class="timer-progress" cx="60" cy="60" r="54"></circle>
+          </svg>
+          <div class="timer-text" id="disp-timer">10</div>
+        </div>
+        <div class="timer-label" id="disp-timer-label">seconden</div>
+      </div>
       <div class="dots">
         <div class="dot"></div><div class="dot"></div><div class="dot"></div>
         <div class="dot"></div><div class="dot"></div>
       </div>
     </div>
   </div>
-  <div class="back-btn" onclick="goTo('page-welcome')"></div>
+  <div class="bottom-btns">
+    <div class="stop-btn" onclick="stopProcess()" id="disp-stop-btn" title="Stoppen">✕</div>
+    <div class="back-btn" onclick="goTo('page-welcome')"></div>
+  </div>
 </div>
 </body>
 </html>

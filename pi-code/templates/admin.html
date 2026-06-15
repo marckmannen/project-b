@@ -34,6 +34,38 @@
     </main>
   </div>
 
+  <!-- Edit Modal -->
+  <div id="edit-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Edit Order</h2>
+        <button class="modal-close" onclick="closeEdit()">&times;</button>
+      </div>
+      <div class="modal-body" id="edit-form"></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeEdit()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEdit()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="delete-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Delete Order</h2>
+        <button class="modal-close" onclick="closeDelete()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete order <strong id="delete-order-id"></strong>? This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeDelete()">Cancel</button>
+        <button class="btn btn-primary" style="background: var(--red); border-color: var(--red);" onclick="executeDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let orders = [];
 
@@ -74,14 +106,14 @@
         return;
       }
       const columns = Object.keys(data[0]);
-      let html = '<table><thead><tr>' + columns.map(c => '<th>' + c + '</th>').join('') + '</tr></thead>';
+      let html = '<table><thead><tr>' + columns.map(c => '<th>' + c + '</th>').join('') + '<th>Actions</th></tr></thead>';
       html += '<tbody>' + data.map(row =>
         '<tr>' + columns.map(c => {
           let val = row[c];
           if (val === null) val = '<em>null</em>';
           else if (typeof val === 'object') val = JSON.stringify(val);
           return '<td title="' + val + '">' + val + '</td>';
-        }).join('') + '</tr>'
+        }).join('') + '<td class="actions"><button class="btn-icon btn-edit" onclick="openEdit(' + row.id + ')">Edit</button><button class="btn-icon btn-delete" onclick="confirmDelete(' + row.id + ')">Delete</button></td></tr>'
       ).join('') + '</tbody></table>';
       container.innerHTML = html;
     }
@@ -102,6 +134,79 @@
       await fetch('/admin/logout', { method: 'POST', credentials: 'same-origin' });
       window.location.href = '/admin/login';
     });
+
+    let currentEditId = null;
+    let currentDeleteId = null;
+
+    function openEdit(id) {
+      const row = orders.find(o => o.id === id);
+      if (!row) return;
+      currentEditId = id;
+      const columns = Object.keys(row).filter(c => c !== 'id');
+      const formEl = document.getElementById('edit-form');
+      formEl.innerHTML = columns.map(c =>
+        '<div class="form-group"><label>' + c + '</label><input type="text" id="edit-' + c + '" value="' + escapeAttr(row[c]) + '"></div>'
+      ).join('');
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function closeEdit() {
+      document.getElementById('edit-modal').classList.add('hidden');
+      currentEditId = null;
+    }
+
+    async function saveEdit() {
+      if (currentEditId === null) return;
+      const row = orders.find(o => o.id === currentEditId);
+      if (!row) return;
+      const columns = Object.keys(row).filter(c => c !== 'id');
+      const data = {};
+      columns.forEach(c => {
+        const val = document.getElementById('edit-' + c).value;
+        data[c] = val === '' ? null : val;
+      });
+      try {
+        await apiFetch('/api/admin/orders/' + currentEditId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        closeEdit();
+        loadOrders();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function confirmDelete(id) {
+      currentDeleteId = id;
+      document.getElementById('delete-order-id').textContent = id;
+      document.getElementById('delete-modal').classList.remove('hidden');
+    }
+
+    function closeDelete() {
+      document.getElementById('delete-modal').classList.add('hidden');
+      currentDeleteId = null;
+    }
+
+    async function executeDelete() {
+      if (currentDeleteId === null) return;
+      try {
+        await apiFetch('/api/admin/orders/' + currentDeleteId, {
+          method: 'DELETE'
+        });
+        closeDelete();
+        loadOrders();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function escapeAttr(val) {
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'object') val = JSON.stringify(val);
+      return String(val).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
 
     checkDbStatus();
     loadOrders();

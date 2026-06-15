@@ -82,7 +82,7 @@ def admin_logout():
     return jsonify({'status': 'ok'})
 
 
-# ── API: Admin orders (read-only, table locked) ──
+# ── API: Admin orders read ──
 @app.route('/api/admin/orders', methods=['GET'])
 def admin_orders():
     if not is_admin():
@@ -93,6 +93,64 @@ def admin_orders():
         cur.execute(f'SELECT * FROM `{ALLOWED_ADMIN_TABLE}` LIMIT 500')
         results = cur.fetchall()
         return jsonify(results), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+
+
+# ── API: Admin edit order ──
+@app.route('/api/admin/orders/<int:order_id>', methods=['PUT'])
+def admin_edit_order(order_id):
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'error': 'Invalid JSON body'}), 400
+
+    cur = mysql.connection.cursor()
+    try:
+        # Fetch existing row to know the columns
+        cur.execute(f'SELECT * FROM `{ALLOWED_ADMIN_TABLE}` WHERE id = %s', (order_id,))
+        existing = cur.fetchone()
+        if not existing:
+            return jsonify({'error': 'Order not found'}), 404
+
+        # Build UPDATE from whatever fields the client sends
+        allowed = set(existing.keys())
+        updates = {}
+        for k, v in data.items():
+            if k in allowed and k != 'id':
+                updates[k] = v
+
+        if not updates:
+            return jsonify({'error': 'No valid fields to update'}), 400
+
+        set_clause = ', '.join(f'`{k}` = %s' for k in updates)
+        values = list(updates.values()) + [order_id]
+        cur.execute(f'UPDATE `{ALLOWED_ADMIN_TABLE}` SET {set_clause} WHERE id = %s', values)
+        mysql.connection.commit()
+        return jsonify({'status': 'ok'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+
+
+# ── API: Admin delete order ──
+@app.route('/api/admin/orders/<int:order_id>', methods=['DELETE'])
+def admin_delete_order(order_id):
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute(f'DELETE FROM `{ALLOWED_ADMIN_TABLE}` WHERE id = %s', (order_id,))
+        if cur.rowcount == 0:
+            return jsonify({'error': 'Order not found'}), 404
+        mysql.connection.commit()
+        return jsonify({'status': 'ok'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
