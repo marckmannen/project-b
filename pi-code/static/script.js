@@ -1,22 +1,22 @@
-// ── STATE ──
+// state
 let lang = 'nl';
 let pinValue = '';
-let dateBuffer = '';   // flat string DDMMYYYY
+let dateBuffer = '';   // flat string ddmyyyy
 
-// ── DISPENSING TIMER ──
+// dispensing timer
 const DISPENSING_DURATION = 10; // seconds
 let dispensingTimeLeft = DISPENSING_DURATION;
 let dispensingInterval = null;
 const TIMER_CIRCUMFERENCE = 2 * Math.PI * 54; // ~339.292
 
-// ── INACTIVITY TIMEOUT ──
+// inactivity timeout
 const INACTIVITY_LIMIT = 60 * 1000; // 30 seconds
 const TIMEOUT_COUNTDOWN = 30; // seconds
 let inactivityTimer = null;
 let timeoutModalTimer = null;
 let timeoutCountdownValue = TIMEOUT_COUNTDOWN;
 
-// ── TRANSLATIONS ──
+// translations
 const T = {
   nl: {
     wTitle: 'Welkom',
@@ -95,11 +95,11 @@ function applyLang() {
   document.getElementById('disp-header').textContent = t.dispHeader;
   document.getElementById('disp-msg').textContent = t.dispMsg;
 
-  // Timer label
+  // timer label
   const timerLabel = document.getElementById('disp-timer-label');
   if (timerLabel) timerLabel.textContent = t.dispTimerLabel;
 
-  // Update flag
+  // update flag
   const fd = document.getElementById('flag-display');
   if (lang === 'nl') {
     fd.src = 'https://img.icons8.com/emoji/48/netherlands-emoji.png';
@@ -107,7 +107,7 @@ function applyLang() {
     fd.src = 'https://img.icons8.com/emoji/48/united-kingdom-emoji.png';
   }
 
-  // End page texts (language dependent)
+  // end page texts (language dependent)
   const endHeader = document.getElementById('end-header');
   const endMsg = document.getElementById('end-msg');
   const endFarewell = document.getElementById('end-farewell');
@@ -125,7 +125,7 @@ function applyLang() {
     btnPrint.textContent = t.btnPrint;
   }
 
-  // Timeout modal texts
+  // timeout modal texts
   const timeoutMsgEl = document.getElementById('timeout-message');
   const timeoutSubEl = document.getElementById('timeout-subtitle');
   if (timeoutMsgEl) timeoutMsgEl.textContent = t.timeoutMessage;
@@ -137,7 +137,7 @@ function toggleLang() {
   applyLang();
 }
 
-// ── NAVIGATION ──
+// navigation
 let autoAdvanceTimer = null;
 
 function goTo(id) {
@@ -145,7 +145,7 @@ function goTo(id) {
   if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
   if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
 
-  // Hide timeout modal when navigating
+  // hide timeout modal when navigating
   hideTimeoutModal();
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -156,7 +156,7 @@ function goTo(id) {
   }
 }
 
-// ── PIN LOGIC ──
+// pin logic
 function pinRender() {
   const d = document.getElementById('pin-display');
   d.innerHTML = '';
@@ -193,7 +193,7 @@ function pinReset() {
 
 pinRender();
 
-// ── DATE LOGIC ──
+// date logic
 function dateFields() {
   const dd = dateBuffer.slice(0, 2).padEnd(2, '_');
   const mm = dateBuffer.slice(2, 4).padEnd(2, '_');
@@ -230,13 +230,13 @@ function dateReset() {
   dateFields();
 }
 
-// Simulate QR scan after 3 seconds on QR page
+// simulate qr scan after 3 seconds on qr page
 document.getElementById('page-qr').addEventListener('click', function() {
   resetInactivityTimer();
   goTo('page-dispensing');
 });
 
-// ── DISPENSING TIMER ──
+// dispensing timer
 function startDispensingTimer() {
   dispensingTimeLeft = DISPENSING_DURATION;
   updateTimerDisplay();
@@ -269,46 +269,46 @@ function updateTimerDisplay() {
   }
 }
 
-// ── STOP PROCESS ──
+// stop process
 function stopProcess() {
   resetInactivityTimer();
 
-  // Clear all timers
+  // clear all timers
   if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
   if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
   hideTimeoutModal();
 
-  // Reset state
+  // reset state
   pinReset();
   dateReset();
 
-  // Go to welcome page
+  // go to welcome page
   goTo('page-welcome');
 }
 
-// ── PRINT LEAFLET ──
+// print leaflet
 function printLeaflet() {
   resetInactivityTimer();
-  // TODO: Implement print functionality
+  // todo: implement print functionality
   console.log('Bijsluiter printen - TODO');
 }
 
-// ── INACTIVITY TIMEOUT ──
+// inactivity timeout
 function resetInactivityTimer() {
   if (inactivityTimer) {
     clearTimeout(inactivityTimer);
   }
 
-  // Hide timeout modal if visible
+  // hide timeout modal if visible
   hideTimeoutModal();
 
-  // Check if we're on admin page (no timeout for admin)
+  // check if we're on admin page (no timeout for admin)
   const activePage = document.querySelector('.page.active');
   if (activePage && activePage.id === 'page-admin') {
     return;
   }
 
-  // Start inactivity timer
+  // start inactivity timer
   inactivityTimer = setTimeout(showTimeoutModal, INACTIVITY_LIMIT);
 }
 
@@ -320,7 +320,7 @@ function showTimeoutModal() {
   timeoutCountdownValue = TIMEOUT_COUNTDOWN;
   updateTimeoutDisplay();
 
-  // Start countdown
+  // start countdown
   timeoutModalTimer = setInterval(() => {
     timeoutCountdownValue--;
     updateTimeoutDisplay();
@@ -357,10 +357,10 @@ function updateTimeoutDisplay() {
   }
 }
 
-// ── GLOBAL ACTIVITY LISTENER ──
+// global activity listener
 document.addEventListener('click', resetInactivityTimer);
 document.addEventListener('touchstart', resetInactivityTimer);
 
-// ── INIT ──
+// init
 applyLang();
 resetInactivityTimer();

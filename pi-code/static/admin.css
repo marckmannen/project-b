@@ -32,7 +32,7 @@ body {
   padding: 0 24px;
 }
 
-/* ── Header ── */
+/* header */
 .admin-header {
   display: flex;
   justify-content: space-between;
@@ -70,7 +70,7 @@ body {
   color: var(--red);
 }
 
-/* ── Navigation ── */
+/* navigation */
 .admin-nav {
   display: flex;
   gap: 4px;
@@ -100,7 +100,7 @@ body {
   border-bottom-color: var(--lavender);
 }
 
-/* ── Tab Content ── */
+/* tab content */
 .tab-content {
   display: none;
 }
@@ -121,7 +121,7 @@ body {
   font-weight: 400;
 }
 
-/* ── Buttons ── */
+/* buttons */
 .btn {
   background: var(--card-bg);
   border: 1px solid var(--border);
@@ -175,7 +175,7 @@ body {
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* ── Tables List ── */
+/* tables list */
 .tables-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -205,7 +205,7 @@ body {
   font-weight: 500;
 }
 
-/* ── Table Detail ── */
+/* table detail */
 .table-detail {
   animation: fadeIn 0.3s ease;
 }
@@ -235,7 +235,7 @@ body {
   gap: 8px;
 }
 
-/* ── Schema ── */
+/* schema */
 .schema-section {
   margin-bottom: 24px;
 }
@@ -264,7 +264,7 @@ body {
   color: var(--lavender-light);
 }
 
-/* ── Data Table ── */
+/* data table */
 .data-toolbar {
   display: flex;
   justify-content: space-between;
@@ -369,7 +369,7 @@ tbody tr:last-child td {
   color: var(--red);
 }
 
-/* ── SQL Query ── */
+/* sql query */
 .query-section {
   margin-bottom: 24px;
 }
@@ -406,7 +406,7 @@ textarea::placeholder {
   border-radius: 0 0 8px 8px;
 }
 
-/* ── Query Results ── */
+/* query results */
 .query-results {
   animation: fadeIn 0.3s ease;
 }
@@ -429,7 +429,7 @@ textarea::placeholder {
   margin-top: 16px;
 }
 
-/* ── Modal ── */
+/* modal */
 .modal-overlay {
   position: fixed;
   top: 0;

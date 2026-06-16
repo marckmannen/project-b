@@ -6,19 +6,18 @@ import os
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'change-me-to-a-random-string')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'defaultsecretkey')
 
-# MySQL configuration from environment variables
+# mysql configuration from environment variables
 app.config['MYSQL_HOST'] = os.getenv('DB_HOST', 'localhost')
 app.config['MYSQL_USER'] = os.getenv('DB_USER', 'root')
 app.config['MYSQL_PASSWORD'] = os.getenv('DB_PASSWORD', '')
 app.config['MYSQL_DB'] = os.getenv('DB_NAME', 'medicine_vault')
 app.config['MYSQL_PORT'] = int(os.getenv('DB_PORT', 3306))
-app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 
 mysql = MySQL(app)
 
-# Only table the admin dashboard may query (read-only)
+# only table the admin dashboard may query (read-only)
 ALLOWED_ADMIN_TABLE = 'orders'
 
 @app.route('/')
@@ -26,7 +25,7 @@ def index():
     return render_template('index.html')
 
 
-# ── API: Health check / connection test ──
+# api: health check / connection test
 @app.route('/api/db-status')
 def db_status():
     try:
@@ -38,12 +37,12 @@ def db_status():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-# ── Admin helper ──
+# admin helper
 def is_admin():
     return session.get('admin_authenticated', False)
 
 
-# ── Admin pages ──
+# admin pages
 @app.route('/admin')
 def admin():
     if not is_admin():
@@ -82,7 +81,7 @@ def admin_logout():
     return jsonify({'status': 'ok'})
 
 
-# ── API: Admin orders read ──
+# admin orders read
 @app.route('/api/admin/orders', methods=['GET'])
 def admin_orders():
     if not is_admin():
@@ -99,7 +98,7 @@ def admin_orders():
         cur.close()
 
 
-# ── API: Admin edit order ──
+# admin edit order
 @app.route('/api/admin/orders/<int:order_id>', methods=['PUT'])
 def admin_edit_order(order_id):
     if not is_admin():
@@ -111,13 +110,13 @@ def admin_edit_order(order_id):
 
     cur = mysql.connection.cursor()
     try:
-        # Fetch existing row to know the columns
+        # fetch existing row to know the columns
         cur.execute(f'SELECT * FROM `{ALLOWED_ADMIN_TABLE}` WHERE id = %s', (order_id,))
         existing = cur.fetchone()
         if not existing:
             return jsonify({'error': 'Order not found'}), 404
 
-        # Build UPDATE from whatever fields the client sends
+        # build update from whatever fields the client sends
         allowed = set(existing.keys())
         updates = {}
         for k, v in data.items():
@@ -138,7 +137,7 @@ def admin_edit_order(order_id):
         cur.close()
 
 
-# ── API: Admin delete order ──
+# admin delete order
 @app.route('/api/admin/orders/<int:order_id>', methods=['DELETE'])
 def admin_delete_order(order_id):
     if not is_admin():

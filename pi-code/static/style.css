@@ -25,7 +25,7 @@ body {
   user-select: none;
 }
 
-/* ── PAGES ── */
+/* pages */
 .page {
   display: none;
   width: 100%;
@@ -42,7 +42,7 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── WELCOME ── */
+/* welcome */
 #page-welcome {
   align-items: flex-start;
   justify-content: center;
@@ -81,7 +81,7 @@ body {
 }
 .welcome-proceed:hover { color: var(--white); }
 
-/* Language flag */
+/* language flag */
 .lang-switch {
   position: absolute;
   top: 28px; right: 36px;
@@ -130,7 +130,7 @@ body {
   gap: 40px;
 }
 
-/* ── BACK ARROW ── */
+/* back arrow */
 .back-btn {
   width: 0;
   height: 0;
@@ -143,7 +143,7 @@ body {
 }
 .back-btn:hover { opacity: 1; }
 
-/* ── BOTTOM BUTTONS WRAPPER ── */
+/* bottom buttons wrapper */
 .bottom-btns {
   position: absolute;
   bottom: 0;
@@ -155,7 +155,7 @@ body {
   padding: 32px;
 }
 
-/* ── STOP BUTTON (bottom-right) ── */
+/* stop button (bottom-right) */
 .stop-btn {
   width: 52px;
   height: 52px;
@@ -176,7 +176,7 @@ body {
   transform: scale(1.05);
 }
 
-/* ── PRINT BUTTON ── */
+/* print button */
 .print-btn {
   background: var(--lavender-btn);
   border: none;
@@ -199,7 +199,7 @@ body {
   transform: translateY(0);
 }
 
-/* ── TIMEOUT MODAL ── */
+/* timeout modal */
 .timeout-modal {
   display: none;
   position: fixed;
@@ -257,7 +257,7 @@ body {
   margin-top: 4px;
 }
 
-/* ── OPTION BUTTONS ── */
+/* option buttons */
 .option-btn {
   background: var(--lavender-btn);
   border: none;
@@ -281,7 +281,7 @@ body {
 }
 .option-btn:active { transform: translateY(0); }
 
-/* ── PINCODE PAGE ── */
+/* pincode page */
 .pin-wrapper {
   display: flex;
   flex-direction: column;
@@ -347,7 +347,7 @@ body {
 }
 .pin-key.confirm:hover { background: rgba(255,255,255,0.25); }
 
-/* ── BIRTHDATE PAGE ── */
+/* birthdate page */
 .date-wrapper {
   display: flex;
   flex-direction: column;
@@ -424,7 +424,7 @@ body {
 }
 .date-submit:hover { background: var(--accent); }
 
-/* ── QR PAGE ── */
+/* qr page */
 .qr-box {
   background: var(--gray-input);
   border-radius: 6px;
@@ -437,7 +437,7 @@ body {
   text-align: left;
 }
 
-/* ── DISPENSING PAGE ── */
+/* dispensing page */
 .dispensing-body {
   display: flex;
   flex-direction: column;
@@ -456,7 +456,7 @@ body {
   max-width: 620px;
 }
 
-/* ── DISPENSING TIMER ── */
+/* dispensing timer */
 .dispensing-timer {
   display: flex;
   flex-direction: column;
