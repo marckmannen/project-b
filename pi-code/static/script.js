@@ -141,7 +141,6 @@ function toggleLang() {
 let autoAdvanceTimer = null;
 
 function goTo(id) {
-  resetInactivityTimer();
   if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
   if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
 
@@ -154,6 +153,9 @@ function goTo(id) {
   if (id === 'page-dispensing') {
     startDispensingTimer();
   }
+
+  // reset inactivity timer after page switch (skip for welcome/admin)
+  resetInactivityTimer();
 }
 
 // pin logic
@@ -302,9 +304,9 @@ function resetInactivityTimer() {
   // hide timeout modal if visible
   hideTimeoutModal();
 
-  // check if we're on admin page (no timeout for admin)
+  // check if we're on a page that shouldn't timeout (admin or welcome)
   const activePage = document.querySelector('.page.active');
-  if (activePage && activePage.id === 'page-admin') {
+  if (activePage && (activePage.id === 'page-admin' || activePage.id === 'page-welcome')) {
     return;
   }
 
