@@ -1,12 +1,26 @@
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from flask_mysqldb import MySQL
+from flask.json.provider import DefaultJSONProvider
 from dotenv import load_dotenv
 import os
+import json
+from datetime import date, datetime
 
 load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'defaultsecretkey')
+
+
+class CustomJSONProvider(DefaultJSONProvider):
+    def default(self, obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        return super().default(obj)
+
+
+app.json_provider_class = CustomJSONProvider
+app.json = CustomJSONProvider(app)
 
 # mysql configuration from environment variables
 app.config['MYSQL_HOST'] = os.getenv('DB_HOST', 'localhost')
@@ -81,6 +95,49 @@ def admin_logout():
     return jsonify({'status': 'ok'})
 
 
+DISPLAY_COLUMNS = ['order_id', 'product_id', 'product_name', 'amount', 'compartment_number', 'status', 'pincode', 'birthdate', 'created_at', 'updated_at']
+EDITABLE_COLUMNS = ['compartment_number', 'status']
+
+
+def cursor_to_dicts(cur, columns_filter=None):
+    """Convert cursor result to list of dicts using column names from cursor.description."""
+    rows = cur.fetchall()
+    if not rows:
+        return []
+    col_names = [col[0] for col in cur.description]
+    if columns_filter:
+        indices = [col_names.index(c) for c in columns_filter if c in col_names]
+        filtered_names = [col_names[i] for i in indices]
+        return [dict(zip(filtered_names, [row[i] for i in indices])) for row in rows]
+    return [dict(zip(col_names, row)) for row in rows]
+
+
+def row_to_dict(row, col_names, columns_filter=None):
+    """Convert a single row tuple to dict using column names."""
+    if row is None:
+        return None
+    if columns_filter:
+        indices = [col_names.index(c) for c in columns_filter if c in col_names]
+        filtered_names = [col_names[i] for i in indices]
+        return dict(zip(filtered_names, [row[i] for i in indices]))
+    return dict(zip(col_names, row))
+
+
+# admin dropdown options (compartments & statuses)
+@app.route('/api/admin/options', methods=['GET'])
+def admin_options():
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    # hardcoded statuses that should always be available
+    all_statuses = ['pending', 'ready', 'completed', 'cancelled']
+
+    return jsonify({
+        'compartments': [1, 2, 3, 4],
+        'statuses': all_statuses
+    }), 200
+
+
 # admin orders read
 @app.route('/api/admin/orders', methods=['GET'])
 def admin_orders():
@@ -89,8 +146,9 @@ def admin_orders():
 
     cur = mysql.connection.cursor()
     try:
-        cur.execute(f'SELECT * FROM `{ALLOWED_ADMIN_TABLE}` LIMIT 500')
-        results = cur.fetchall()
+        columns_select = ', '.join(['id'] + DISPLAY_COLUMNS)
+        cur.execute(f'SELECT {columns_select} FROM `{ALLOWED_ADMIN_TABLE}` LIMIT 500')
+        results = cursor_to_dicts(cur)
         return jsonify(results), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -98,7 +156,7 @@ def admin_orders():
         cur.close()
 
 
-# admin edit order
+# admin edit order (compartment_number and status only)
 @app.route('/api/admin/orders/<int:order_id>', methods=['PUT'])
 def admin_edit_order(order_id):
     if not is_admin():
@@ -110,18 +168,16 @@ def admin_edit_order(order_id):
 
     cur = mysql.connection.cursor()
     try:
-        # fetch existing row to know the columns
-        cur.execute(f'SELECT * FROM `{ALLOWED_ADMIN_TABLE}` WHERE id = %s', (order_id,))
-        existing = cur.fetchone()
-        if not existing:
+        # check if the order exists
+        cur.execute(f'SELECT id FROM `{ALLOWED_ADMIN_TABLE}` WHERE id = %s', (order_id,))
+        if not cur.fetchone():
             return jsonify({'error': 'Order not found'}), 404
 
-        # build update from whatever fields the client sends
-        allowed = set(existing.keys())
+        # only allow editing specific fields
         updates = {}
-        for k, v in data.items():
-            if k in allowed and k != 'id':
-                updates[k] = v
+        for k in EDITABLE_COLUMNS:
+            if k in data:
+                updates[k] = data[k]
 
         if not updates:
             return jsonify({'error': 'No valid fields to update'}), 400
@@ -150,6 +206,78 @@ def admin_delete_order(order_id):
             return jsonify({'error': 'Order not found'}), 404
         mysql.connection.commit()
         return jsonify({'status': 'ok'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+
+
+# user login with pincode or birthdate
+@app.route('/api/user/login', methods=['POST'])
+def user_login():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'error': 'Invalid request'}), 400
+
+    pincode = data.get('pincode')
+    birthdate = data.get('birthdate')   # expected: 'YYYY-MM-DD'
+
+    if not pincode and not birthdate:
+        return jsonify({'error': 'No credentials provided'}), 400
+
+    cur = mysql.connection.cursor()
+    try:
+        columns_select = ', '.join(['id', 'product_name', 'amount', 'compartment_number', 'status', 'pincode', 'birthdate', 'created_at', 'updated_at'])
+        if pincode:
+            # find orders that match this pincode and are either 'pending' or 'ready'
+            cur.execute(
+                f'SELECT {columns_select} FROM `{ALLOWED_ADMIN_TABLE}` WHERE pincode = %s AND status IN ("pending", "ready")',
+                (pincode,)
+            )
+        elif birthdate:
+            cur.execute(
+                f'SELECT {columns_select} FROM `{ALLOWED_ADMIN_TABLE}` WHERE birthdate = %s AND status IN ("pending", "ready")',
+                (birthdate,)
+            )
+        else:
+            return jsonify({'error': 'No valid login method'}), 400
+
+        results = cursor_to_dicts(cur)
+        if not results:
+            return jsonify({'error': 'Geen openstaande orders gevonden. / No open orders found.'}), 404
+
+        return jsonify(results), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+
+
+# user picks up an order (updates status + triggers dispensing)
+@app.route('/api/user/pickup/<int:order_id>', methods=['POST'])
+def user_pickup(order_id):
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute(
+            f'SELECT id, compartment_number, status FROM `{ALLOWED_ADMIN_TABLE}` WHERE id = %s',
+            (order_id,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({'error': 'Order not found'}), 404
+
+        if row[2] not in ('pending', 'ready'):
+            return jsonify({'error': 'Order is not available for pickup'}), 400
+
+        compartment = row[1]
+
+        # update status to ready (for pickup flow)
+        cur.execute(
+            f'UPDATE `{ALLOWED_ADMIN_TABLE}` SET status = %s WHERE id = %s',
+            ('ready', order_id)
+        )
+        mysql.connection.commit()
+        return jsonify({'status': 'ok', 'compartment': compartment}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:

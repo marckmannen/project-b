@@ -3,6 +3,9 @@ let lang = 'nl';
 let pinValue = '';
 let dateBuffer = '';   // flat string ddmyyyy
 
+// user orders
+let userOrders = [];
+
 // dispensing timer
 const DISPENSING_DURATION = 10; // seconds
 let dispensingTimeLeft = DISPENSING_DURATION;
@@ -39,11 +42,13 @@ const T = {
     dispMsg: 'Wacht tot de deur opengaat',
     dispTimerLabel: 'seconden',
     endHeader: 'Bedankt voor uw komst',
-    endMsg: 'Zorg dat u al uw medicijnen uit het vak heeft gehaald!',
-    endFarewell: 'Tot ziens!',
+    endMsg: 'Heeft u alle medicijnen uit het vak gehaald?',
+    finishBtn: 'Klik hier om af te ronden',
     btnPrint: 'Bijsluiter printen',
     timeoutMessage: 'Systeem wordt reset door inactiviteit.',
     timeoutSubtitle: 'Klik ergens om te heractiveren',
+    ordersHeader: 'Uw openstaande orders',
+    ordersError: 'Geen openstaande orders gevonden.'
   },
   en: {
     wTitle: 'Welcome',
@@ -66,11 +71,13 @@ const T = {
     dispMsg: 'Wait until the door opens',
     dispTimerLabel: 'seconds',
     endHeader: 'Thank you for visiting',
-    endMsg: 'Make sure to take all your medicine from the compartment!',
-    endFarewell: 'Goodbye!',
+    endMsg: 'Did you take all your medicine from the compartment?',
+    finishBtn: 'Click here to finish',
     btnPrint: 'Print leaflet',
     timeoutMessage: 'Process will be stopped due to inactivity.',
     timeoutSubtitle: 'Click anywhere to cancel',
+    ordersHeader: 'Your open orders',
+    ordersError: 'No open orders found.'
   }
 };
 
@@ -110,7 +117,7 @@ function applyLang() {
   // end page texts (language dependent)
   const endHeader = document.getElementById('end-header');
   const endMsg = document.getElementById('end-msg');
-  const endFarewell = document.getElementById('end-farewell');
+  const btnFinish = document.getElementById('btn-finish');
   const btnPrint = document.getElementById('btn-print');
   if (endHeader) {
     endHeader.textContent = t.endHeader;
@@ -118,8 +125,8 @@ function applyLang() {
   if (endMsg) {
     endMsg.textContent = t.endMsg;
   }
-  if (endFarewell) {
-    endFarewell.textContent = t.endFarewell;
+  if (btnFinish) {
+    btnFinish.textContent = t.finishBtn;
   }
   if (btnPrint) {
     btnPrint.textContent = t.btnPrint;
@@ -130,6 +137,10 @@ function applyLang() {
   const timeoutSubEl = document.getElementById('timeout-subtitle');
   if (timeoutMsgEl) timeoutMsgEl.textContent = t.timeoutMessage;
   if (timeoutSubEl) timeoutSubEl.textContent = t.timeoutSubtitle;
+
+  // orders page texts
+  const ordersHeaderEl = document.getElementById('orders-header');
+  if (ordersHeaderEl) ordersHeaderEl.textContent = t.ordersHeader;
 }
 
 function toggleLang() {
@@ -144,7 +155,7 @@ function goTo(id) {
   if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
   if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
 
-  // hide timeout modal when navigating
+
   hideTimeoutModal();
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -154,7 +165,6 @@ function goTo(id) {
     startDispensingTimer();
   }
 
-  // reset inactivity timer after page switch (skip for welcome/admin)
   resetInactivityTimer();
 }
 
@@ -183,7 +193,7 @@ function pinDel() {
 
 function pinConfirm() {
   if (pinValue.length > 0) {
-    goTo('page-dispensing');
+    loginUserByPin(pinValue);
     pinReset();
   }
 }
@@ -222,7 +232,11 @@ function dateDel() {
 
 function dateConfirm() {
   if (dateBuffer.length === 8) {
-    goTo('page-dispensing');
+    const dd = dateBuffer.slice(0, 2);
+    const mm = dateBuffer.slice(2, 4);
+    const yyyy = dateBuffer.slice(4, 8);
+    const birthdateStr = yyyy + '-' + mm + '-' + dd;
+    loginUserByBirthdate(birthdateStr);
     dateReset();
   }
 }
@@ -288,9 +302,21 @@ function stopProcess() {
   goTo('page-welcome');
 }
 
+// finish session (from end page)
+function finishSession() {
+  resetInactivityTimer();
+  window.location.reload();
+}
+
 // print leaflet
 function printLeaflet() {
   resetInactivityTimer();
+
+  // disable after first click
+  const btn = document.getElementById('btn-print');
+  if (btn.disabled) return;
+  btn.disabled = true;
+
   // todo: implement print functionality
   console.log('Bijsluiter printen - TODO');
 }
@@ -366,3 +392,111 @@ document.addEventListener('touchstart', resetInactivityTimer);
 // init
 applyLang();
 resetInactivityTimer();
+
+// ── User Login ──
+async function loginUserByPin(pin) {
+  try {
+    const res = await fetch('/api/user/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pincode: pin })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      userOrders = data;
+      renderUserOrders(userOrders);
+      goTo('page-orders');
+    } else {
+      showError(data.error || 'Inloggen mislukt');
+    }
+  } catch (e) {
+    showError('Verbindingsfout, probeer opnieuw.');
+  }
+}
+
+async function loginUserByBirthdate(date) {
+  try {
+    const res = await fetch('/api/user/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ birthdate: date })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      userOrders = data;
+      renderUserOrders(userOrders);
+      goTo('page-orders');
+    } else {
+      showError(data.error || 'Inloggen mislukt');
+    }
+  } catch (e) {
+    showError('Verbindingsfout, probeer opnieuw.');
+  }
+}
+
+function showError(msg) {
+  // show a brief error toast
+  let toast = document.getElementById('login-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'login-toast';
+    toast.className = 'login-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ── Render User Orders ──
+function renderUserOrders(orders) {
+  const container = document.getElementById('orders-list');
+  const errorEl = document.getElementById('orders-error');
+  errorEl.style.display = 'none';
+
+  if (!orders || !orders.length) {
+    container.innerHTML = '';
+    errorEl.textContent = T[lang].ordersError;
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  let html = '';
+  orders.forEach(function(order) {
+    const compartment = order.compartment_number != null ? 'Vak ' + order.compartment_number : '—';
+    const status = order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : '—';
+    const statusClass = order.status ? 'status-badge ' + order.status.toLowerCase() : '';
+    const isReady = order.status === 'ready';
+
+    html += '<div class="user-order-card' + (isReady ? '' : ' locked') + '" onclick="' + (isReady ? 'pickUpOrder(' + order.id + ')' : 'showError(\'Order nog niet beschikbaar\')') + '">';
+    html += '<div class="order-info">';
+    html += '<div class="order-product">' + escapeXml(order.product_name || '—') + '</div>';
+    html += '<div class="order-meta">';
+    html += '<span class="' + statusClass + '">' + status + '</span>';
+    html += '<span>' + compartment + '</span>';
+    html += '</div></div>';
+    html += '<div class="order-amount">' + order.amount + 'x</div>';
+    html += '<div class="order-arrow">' + (isReady ? '›' : '🔒') + '</div>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+async function pickUpOrder(orderId) {
+  try {
+    const res = await fetch('/api/user/pickup/' + orderId, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      goTo('page-dispensing');
+    } else {
+      showError(data.error || 'Kon order niet ophalen');
+    }
+  } catch (e) {
+    showError('Verbindingsfout, probeer opnieuw.');
+  }
+}
+
+function escapeXml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}

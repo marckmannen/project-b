@@ -179,24 +179,70 @@ body {
 /* print button */
 .print-btn {
   background: var(--lavender-btn);
-  border: none;
-  border-radius: 6px;
+  border: 3px solid var(--white);
+  border-radius: 12px;
   color: var(--white);
   font-family: 'DM Sans', sans-serif;
-  font-size: clamp(18px, 2.4vw, 24px);
-  font-weight: 300;
-  letter-spacing: 0.08em;
-  padding: 20px 36px;
+  font-size: clamp(22px, 3.2vw, 34px);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  padding: 28px 48px;
   cursor: pointer;
-  transition: background 0.2s, transform 0.15s;
+  transition: background 0.2s, transform 0.15s, opacity 0.2s, box-shadow 0.2s;
   margin-top: 12px;
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.1);
 }
+
 .print-btn:hover {
   background: var(--lavender);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 24px rgba(255, 255, 255, 0.2);
 }
+
 .print-btn:active {
   transform: translateY(0);
+}
+
+.print-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  background: var(--lavender-btn);
+}
+
+/* finish button - large and clearly clickable */
+.finish-btn {
+  background: var(--lavender);
+  border: 3px solid var(--white);
+  border-radius: 12px;
+  color: var(--white);
+  font-family: 'DM Sans', sans-serif;
+  font-size: clamp(22px, 3.2vw, 34px);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  padding: 28px 48px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  margin-top: 20px;
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15);
+  animation: finishPulse 2s ease-in-out infinite;
+}
+
+.finish-btn:hover {
+  background: var(--lavender-btn);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 8px 32px rgba(255, 255, 255, 0.25);
+  animation: none;
+}
+
+.finish-btn:active {
+  transform: translateY(0) scale(1);
+  animation: none;
+}
+
+@keyframes finishPulse {
+  0%, 100% { box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15); }
+  50% { box-shadow: 0 4px 32px rgba(255, 255, 255, 0.35); }
 }
 
 /* timeout modal */
@@ -553,4 +599,137 @@ body {
   max-width: 620px;
   line-height: 1.6;
   font-weight: 400;
+}
+
+/* ── User Orders Page ── */
+.user-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 36px;
+  max-width: 700px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.user-order-card {
+  display: flex;
+  align-items: center;
+  background: var(--card-bg, #151560);
+  border: 1px solid var(--border, rgba(133,133,200,0.2));
+  border-radius: 10px;
+  padding: 20px 28px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s, border-color 0.2s;
+}
+
+.user-order-card:hover {
+  background: rgba(133, 133, 200, 0.15);
+  border-color: var(--lavender);
+  transform: translateY(-2px);
+}
+
+.user-order-card:active {
+  transform: translateY(0);
+}
+
+.order-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.order-product {
+  font-size: clamp(20px, 2.8vw, 26px);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  color: var(--white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: clamp(14px, 2vw, 18px);
+  color: rgba(255,255,255,0.7);
+}
+
+.order-amount {
+  font-size: clamp(22px, 3vw, 28px);
+  font-weight: 300;
+  color: var(--white);
+  margin-right: 16px;
+}
+
+.order-arrow {
+  font-size: 32px;
+  color: var(--white);
+  opacity: 0.6;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.user-order-card:hover .order-arrow {
+  opacity: 1;
+  transform: translateX(4px);
+}
+
+/* Status badges on orders page */
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.status-badge.pending {
+  background: rgba(255, 193, 7, 0.25);
+  color: #ffc107;
+}
+
+.status-badge.ready {
+  background: rgba(33, 150, 243, 0.25);
+  color: #42a5f5;
+}
+
+/* Orders error message */
+.orders-error {
+  display: none;
+  text-align: center;
+  font-size: clamp(18px, 2.4vw, 24px);
+  color: #e74c3c;
+  padding: 24px;
+}
+
+/* Login error toast */
+.login-toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(231, 76, 60, 0.95);
+  color: var(--white);
+  padding: 16px 32px;
+  border-radius: 8px;
+  font-size: clamp(16px, 2vw, 20px);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 10000;
+  text-align: center;
+  max-width: 90vw;
+}
+
+.login-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }

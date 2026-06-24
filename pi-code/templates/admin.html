@@ -28,7 +28,7 @@
         <span id="row-count" class="row-count"></span>
       </div>
 
-      <div id="table-container" class="table-wrapper">
+      <div id="orders-container" class="orders-list">
         <div class="loading">Loading orders...</div>
       </div>
     </main>
@@ -68,6 +68,9 @@
 
   <script>
     let orders = [];
+    let compartments = [1, 2, 3, 4];
+    let statuses = ['pending', 'ready', 'completed', 'cancelled'];
+    let expandedOrder = null; // track which order is expanded
 
     async function apiFetch(url, options = {}) {
       const res = await fetch(url, { credentials: 'same-origin', ...options });
@@ -87,8 +90,16 @@
       } catch (e) { el.textContent = 'Error'; el.className = 'db-status disconnected'; }
     }
 
+    async function loadOptions() {
+      try {
+        const data = await apiFetch('/api/admin/options');
+        if (data.compartments) compartments = data.compartments;
+        if (data.statuses) statuses = data.statuses;
+      } catch (e) { /* keep defaults */ }
+    }
+
     async function loadOrders() {
-      const container = document.getElementById('table-container');
+      const container = document.getElementById('orders-container');
       try {
         const data = await apiFetch('/api/admin/orders');
         orders = data;
@@ -99,22 +110,63 @@
       }
     }
 
+
+    function statusBadge(status) {
+      if (!status) return '<span class="status-badge empty">—</span>';
+      const s = status.toLowerCase();
+      return '<span class="status-badge ' + s + '">' + status + '</span>';
+    }
+
+    function toggleExpand(id) {
+      expandedOrder = expandedOrder === id ? null : id;
+      renderOrders(orders);
+    }
+
     function renderOrders(data) {
-      const container = document.getElementById('table-container');
+      const container = document.getElementById('orders-container');
       if (!data.length) {
         container.innerHTML = '<div class="empty-state">No orders found</div>';
         return;
       }
-      const columns = Object.keys(data[0]);
-      let html = '<table><thead><tr>' + columns.map(c => '<th>' + c + '</th>').join('') + '<th>Actions</th></tr></thead>';
-      html += '<tbody>' + data.map(row =>
-        '<tr>' + columns.map(c => {
-          let val = row[c];
-          if (val === null) val = '<em>null</em>';
-          else if (typeof val === 'object') val = JSON.stringify(val);
-          return '<td title="' + val + '">' + val + '</td>';
-        }).join('') + '<td class="actions"><button class="btn-icon btn-edit" onclick="openEdit(' + row.id + ')">Edit</button><button class="btn-icon btn-delete" onclick="confirmDelete(' + row.id + ')">Delete</button></td></tr>'
-      ).join('') + '</tbody></table>';
+      let html = '';
+      data.forEach(function(row) {
+        const isExpanded = expandedOrder === row.id;
+        const compartment = row.compartment_number != null ? 'Compartment ' + row.compartment_number : '—';
+        const dateStr = row.created_at ? new Date(row.created_at).toLocaleDateString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+        // card header (always visible)
+        html += '<div class="order-card' + (isExpanded ? ' expanded' : '') + '">';
+        html += '<div class="order-card-header" onclick="toggleExpand(' + row.id + ')">';
+        html += '<div class="order-card-main">';
+        html += '<div class="order-id">' + escapeAttr(row.id) + '</div>';
+        html += '<div class="order-card-meta">';
+        html += statusBadge(row.status);
+        html += '<span class="compartment-badge">' + compartment + '</span>';
+        html += '<span class="order-date"> Created: ' + dateStr + '</span>';
+        html += '</div></div>';
+        html += '<div class="order-arrow">' + (isExpanded ? '▾' : '▸') + '</div>';
+        html += '</div>';
+
+        // expanded details
+        if (isExpanded) {
+          html += '<div class="order-card-details">';
+          html += '<div class="details-grid">';
+          html += '<div class="detail-row"><span class="detail-label">Product Name</span><span class="detail-value">' + escapeAttr(row.product_name) + '</span></div>';
+          html += '<div class="detail-row"><span class="detail-label">Amount</span><span class="detail-value">' + escapeAttr(row.amount) + '</span></div>';
+          html += '<div class="detail-row"><span class="detail-label">Created At</span><span class="detail-value">' + escapeAttr(row.created_at) + '</span></div>';
+          html += '<div class="detail-row"><span class="detail-label">Updated At</span><span class="detail-value">' + escapeAttr(row.updated_at) + '</span></div>';
+          html += '<div class="detail-row"><span class="detail-label">Birthdate</span><span class="detail-value">' + escapeAttr(row.birthdate || '—') + '</span></div>';
+          html += '<div class="detail-row"><span class="detail-label">Pincode</span><span class="detail-value">' + escapeAttr(row.pincode || '—') + '</span></div>';
+          html += '<div class="detail-row"><span class="detail-label">Order ID (external)</span><span class="detail-value detail-mono">' + escapeAttr(row.order_id || '—') + '</span></div>';
+          html += '<div class="detail-row"><span class="detail-label">Product ID</span><span class="detail-value detail-mono">' + escapeAttr(row.product_id) + '</span></div>';
+          html += '</div>';
+          html += '<div class="order-actions">';
+          html += '<button class="btn btn-ghost" onclick="openEdit(' + row.id + ')">Edit Status / Compartment</button>';
+          html += '<button class="btn btn-ghost btn-danger" onclick="confirmDelete(' + row.id + ')">Delete</button>';
+          html += '</div></div>';
+        }
+        html += '</div>';
+      });
       container.innerHTML = html;
     }
 
@@ -142,11 +194,21 @@
       const row = orders.find(o => o.id === id);
       if (!row) return;
       currentEditId = id;
-      const columns = Object.keys(row).filter(c => c !== 'id');
       const formEl = document.getElementById('edit-form');
-      formEl.innerHTML = columns.map(c =>
-        '<div class="form-group"><label>' + c + '</label><input type="text" id="edit-' + c + '" value="' + escapeAttr(row[c]) + '"></div>'
-      ).join('');
+
+      const compartmentOptions = '<option value="">— Nog niet toegewezen —</option>' + compartments.map(function(c) {
+        return '<option value="' + c + '"' + (row.compartment_number == c ? ' selected' : '') + '>' + c + '</option>';
+      }).join('');
+
+      const statusOptions = statuses.map(function(s) {
+        return '<option value="' + s + '"' + (row.status === s ? ' selected' : '') + '>' + s + '</option>';
+      }).join('');
+
+      formEl.innerHTML =
+        '<div class="form-group"><label>Compartment Number</label>' +
+        '<select id="edit-compartment_number">' + compartmentOptions + '</select></div>' +
+        '<div class="form-group"><label>Status</label>' +
+        '<select id="edit-status">' + statusOptions + '</select></div>';
       document.getElementById('edit-modal').classList.remove('hidden');
     }
 
@@ -157,19 +219,14 @@
 
     async function saveEdit() {
       if (currentEditId === null) return;
-      const row = orders.find(o => o.id === currentEditId);
-      if (!row) return;
-      const columns = Object.keys(row).filter(c => c !== 'id');
-      const data = {};
-      columns.forEach(c => {
-        const val = document.getElementById('edit-' + c).value;
-        data[c] = val === '' ? null : val;
-      });
+      const compartmentVal = document.getElementById('edit-compartment_number').value;
+      const compartment_number = compartmentVal === '' ? null : parseInt(compartmentVal, 10);
+      const status = document.getElementById('edit-status').value;
       try {
         await apiFetch('/api/admin/orders/' + currentEditId, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
+          body: JSON.stringify({ compartment_number: compartment_number, status: status })
         });
         closeEdit();
         loadOrders();
@@ -209,6 +266,7 @@
     }
 
     checkDbStatus();
+    loadOptions();
     loadOrders();
   </script>
 </body>

@@ -558,6 +558,229 @@ textarea::placeholder {
   color: var(--red);
 }
 
+/* ── Orders List (cards) ── */
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 40px;
+}
+
+.order-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.order-card:hover {
+  border-color: var(--lavender);
+}
+
+.order-card.expanded {
+  border-color: var(--lavender);
+  box-shadow: 0 2px 16px rgba(133, 133, 200, 0.15);
+}
+
+.order-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: background 0.15s;
+  user-select: none;
+}
+
+.order-card-header:hover {
+  background: rgba(133, 133, 200, 0.06);
+}
+
+.order-card-main {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-width: 0;
+}
+
+.order-id {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--white);
+  white-space: nowrap;
+  position: relative;
+  max-width: 260px;
+}
+
+.order-id-tooltip {
+  display: none;
+  position: absolute;
+  bottom: 120%;
+  left: 0;
+  background: var(--navy);
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.order-id:hover .order-id-tooltip {
+  display: block;
+}
+
+.order-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: capitalize;
+  letter-spacing: 0.04em;
+}
+
+.status-badge.pending {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+}
+
+.status-badge.ready {
+  background: rgba(33, 150, 243, 0.15);
+  color: #42a5f5;
+}
+
+.status-badge.completed {
+  background: rgba(46, 204, 113, 0.15);
+  color: #2ecc71;
+}
+
+.status-badge.cancelled {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+}
+
+.status-badge.empty {
+  background: rgba(255,255,255,0.05);
+  color: var(--lavender);
+}
+
+.compartment-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255,255,255,0.06);
+  color: var(--lavender-light);
+  letter-spacing: 0.04em;
+}
+
+.order-date {
+  font-size: 12px;
+  color: var(--lavender);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.order-arrow {
+  font-size: 14px;
+  color: var(--lavender);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+/* expanded details */
+.order-card-details {
+  padding: 0 20px 16px 20px;
+  animation: slideDown 0.25s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--lavender);
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 14px;
+  color: var(--white);
+  word-break: break-word;
+}
+
+.detail-mono {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--lavender-light);
+}
+
+.order-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.btn-danger {
+  color: var(--red) !important;
+}
+
+.btn-danger:hover {
+  background: var(--red-bg) !important;
+  color: var(--red) !important;
+}
+
+.modal-body select {
+  width: 100%;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  color: var(--white);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.2s;
+  cursor: pointer;
+}
+
+.modal-body select:focus {
+  border-color: var(--lavender);
+}
+
+
 td.empty {
   text-align: center;
   color: var(--lavender-light);

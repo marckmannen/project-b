@@ -51,7 +51,7 @@
     <div class="page-header" id="end-header"></div>
     <div class="page-body end-body">
       <div class="end-msg" id="end-msg"></div>
-      <div class="end-farewell" id="end-farewell"></div>
+      <button class="finish-btn" id="btn-finish" onclick="finishSession()">Klik hier om af te ronden</button>
       <button class="print-btn" id="btn-print" onclick="printLeaflet()">Bijsluiter printen</button>
     </div>
   </div>
@@ -165,6 +165,21 @@
   <div class="bottom-btns">
     <div class="stop-btn" onclick="stopProcess()" title="Stoppen">✕</div>
     <div class="back-btn" onclick="goTo('page-login')"></div>
+  </div>
+</div>
+
+<!-- user orders page -->
+<div id="page-orders" class="page">
+  <div class="inner-page">
+    <div class="page-header" id="orders-header">Uw openstaande orders</div>
+    <div class="page-body">
+      <div id="orders-error" class="orders-error" style="display:none;"></div>
+      <div id="orders-list" class="user-orders-list"></div>
+    </div>
+  </div>
+  <div class="bottom-btns">
+    <div class="stop-btn" onclick="stopProcess()" title="Stoppen">✕</div>
+    <div class="back-btn" onclick="goTo('page-welcome')"></div>
   </div>
 </div>
 
