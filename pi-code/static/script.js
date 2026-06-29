@@ -304,8 +304,22 @@ function stopProcess() {
 }
 
 // finish session (from end page)
-function finishSession() {
+async function finishSession() {
   resetInactivityTimer();
+  console.log('[finish] completing order:', currentPickupOrderId);
+
+  // Try to complete the order first
+  if (currentPickupOrderId) {
+    try {
+      const res = await fetch('/api/user/complete/' + currentPickupOrderId, { method: 'POST' });
+      const data = await res.json();
+      console.log('[finish] status:', res.status, JSON.stringify(data));
+    } catch (e) {
+      console.error('[finish] error completing order:', e);
+    }
+  }
+
+  // Reload page to reset everything
   window.location.reload();
 }
 
@@ -317,6 +331,7 @@ async function printLeaflet() {
   const btn = document.getElementById('btn-print');
   if (btn.disabled) return;
   btn.disabled = true;
+  btn.textContent = btn.textContent + '...';
 
   try {
     const res = await fetch('/api/print/receipt', {
@@ -326,10 +341,24 @@ async function printLeaflet() {
     });
     const data = await res.json();
     if (!res.ok) {
-      console.error('Print error:', data.error);
+      showError(data.error || 'Afdrukken mislukt');
+      btn.textContent = 'Opnieuw proberen';
+      btn.disabled = false;
     }
   } catch (e) {
-    console.error('Print failed:', e);
+    showError('Verbindingsfout, probeer opnieuw.');
+    btn.textContent = 'Opnieuw proberen';
+    btn.disabled = false;
+  }
+}
+      body: JSON.stringify({ order_id: currentPickupOrderId })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showError(data.error || 'Afdrukken mislukt');
+    }
+  } catch (e) {
+    showError('Verbindingsfout, probeer opnieuw.');
   }
 }
 
@@ -494,12 +523,14 @@ function renderUserOrders(orders) {
   container.innerHTML = html;
 }
 
+// pick up order
 async function pickUpOrder(orderId) {
   try {
     const res = await fetch('/api/user/pickup/' + orderId, { method: 'POST' });
     const data = await res.json();
     if (res.ok) {
       currentPickupOrderId = orderId;
+      console.log('[pickup] order', orderId, 'accepted — going to dispensing');
       goTo('page-dispensing');
     } else {
       showError(data.error || 'Kon order niet ophalen');

@@ -4,6 +4,7 @@ from flask.json.provider import DefaultJSONProvider
 from dotenv import load_dotenv
 import os
 import serial
+import time
 from datetime import date, datetime
 
 load_dotenv()
@@ -276,12 +277,8 @@ def user_pickup(order_id):
 
         compartment = row[1]
 
-        # update status to ready (for pickup flow)
-        cur.execute(
-            f'UPDATE `{ALLOWED_ADMIN_TABLE}` SET status = %s WHERE id = %s',
-            ('ready', order_id)
-        )
-        mysql.connection.commit()
+        # DO NOT change status yet - wait until user finishes
+        # Status stays 'ready' during dispensing
         return jsonify({'status': 'ok', 'compartment': compartment}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -302,7 +299,7 @@ def print_receipt():
         # fetch order + user info
         cur.execute(
             'SELECT o.product_name, o.amount, o.compartment_number, o.birthdate, '
-            '       u.name, o.pharmacy_id '
+            '       u.name '
             'FROM orders o '
             'LEFT JOIN users u ON o.user_id = u.id '
             'WHERE o.id = %s',
@@ -315,18 +312,13 @@ def print_receipt():
         product_name = row[0] or '—'
         amount = row[1] or 0
         compartment = row[2]
-        birthdate = row[3] or '—'
         patient_name = row[4] or 'Klant'
-        pharmacy_id = row[5] or PHARMACY_NAME
-
-        # use pharmacy name from env if available, else fallback
-        pharmacy = PHARMACY_NAME
 
         today = datetime.now().strftime('%d-%m-%Y')
 
         # build receipt text
         lines = [
-            pharmacy,
+            PHARMACY_NAME,
             '',
             f'Datum: {today}',
             f'Naam: {patient_name}',
@@ -337,24 +329,59 @@ def print_receipt():
         ]
         if compartment is not None:
             lines.append(f'Vak: {compartment}')
-        lines.extend(['', '---- Ei\[nd bonnetje ----', '', '', '', ''])
+        lines.extend(['', '---- Eind bonnetje ----', '', '', '', ''])
 
         receipt_text = '\n'.join(lines)
 
         # send to printer
         try:
-            ser = serial.Serial(PRINTER_PORT, PRINTER_BAUD, timeout=1)
+            ser = serial.Serial(PRINTER_PORT, PRINTER_BAUD, timeout=2)
             try:
                 ser.write(b'\x1b\x40')  # ESC @ — init printer
-                for char in receipt_text.encode('latin-1'):
-                    ser.write(bytes([char]))
-                ser.write(b'\x1d\x56\x01')  # GS V 1 — cut paper
+                ser.write(receipt_text.encode('latin-1'))
+                ser.flush()
+                ser.write(b'\x1b\x64\x03')  # ESC d 3 — feed 3 lines
+                ser.flush()
             finally:
                 ser.close()
         except serial.SerialException as se:
-            # printer unavailable — still return ok so UX isn't broken
-            return jsonify({'status': 'ok', 'warning': str(se)}), 200
+            # PermissionError? Give helpful message
+            error_msg = str(se)
+            if 'permission' in error_msg.lower() or 'access' in error_msg.lower():
+                error_msg = (
+                    f'No permission to access {PRINTER_PORT}. '
+                    f'Fix: sudo usermod -a -G dialout pi && sudo reboot  '
+                    f'(or add your user to dialout group)'
+                )
+            return jsonify({'error': f'Printer error: {error_msg}'}), 500
+        except Exception as pe:
+            return jsonify({'error': f'Print failed: {str(pe)}'}), 500
+        
+        # also set order to completed on successful print
+        try:
+            cur.execute(
+                f'UPDATE `{ALLOWED_ADMIN_TABLE}` SET status = %s WHERE id = %s',
+                ('completed', order_id)
+            )
+            mysql.connection.commit()
+        except:
+            pass
+        
+        return jsonify({'status': 'ok'}), 200
+    finally:
+        cur.close()
 
+
+# user completes their pickup (sets order to completed)
+@app.route('/api/user/complete/<int:order_id>', methods=['POST'])
+def user_complete(order_id):
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute(
+            f'UPDATE `{ALLOWED_ADMIN_TABLE}` SET status = %s WHERE id = %s',
+            ('completed', order_id)
+        )
+        mysql.connection.commit()
         return jsonify({'status': 'ok'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
