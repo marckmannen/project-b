@@ -5,6 +5,7 @@ let dateBuffer = '';   // flat string ddmyyyy
 
 // user orders
 let userOrders = [];
+let currentPickupOrderId = null; // track which order was picked up for printing
 
 // dispensing timer
 const DISPENSING_DURATION = 10; // seconds
@@ -309,7 +310,7 @@ function finishSession() {
 }
 
 // print leaflet
-function printLeaflet() {
+async function printLeaflet() {
   resetInactivityTimer();
 
   // disable after first click
@@ -317,8 +318,19 @@ function printLeaflet() {
   if (btn.disabled) return;
   btn.disabled = true;
 
-  // todo: implement print functionality
-  console.log('Bijsluiter printen - TODO');
+  try {
+    const res = await fetch('/api/print/receipt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: currentPickupOrderId })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('Print error:', data.error);
+    }
+  } catch (e) {
+    console.error('Print failed:', e);
+  }
 }
 
 // inactivity timeout
@@ -487,6 +499,7 @@ async function pickUpOrder(orderId) {
     const res = await fetch('/api/user/pickup/' + orderId, { method: 'POST' });
     const data = await res.json();
     if (res.ok) {
+      currentPickupOrderId = orderId;
       goTo('page-dispensing');
     } else {
       showError(data.error || 'Kon order niet ophalen');

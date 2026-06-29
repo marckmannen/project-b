@@ -4,12 +4,18 @@ from flask.json.provider import DefaultJSONProvider
 from dotenv import load_dotenv
 import os
 import json
+import serial
 from datetime import date, datetime
 
 load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'defaultsecretkey')
+
+# receipt printer config
+PRINTER_PORT = os.getenv('PRINTER_PORT', '/dev/ttyACM0')
+PRINTER_BAUD = int(os.getenv('PRINTER_BAUD', '9600'))
+PHARMACY_NAME = os.getenv('PHARMACY_NAME', 'Medicijnkluis')
 
 
 class CustomJSONProvider(DefaultJSONProvider):
@@ -278,6 +284,79 @@ def user_pickup(order_id):
         )
         mysql.connection.commit()
         return jsonify({'status': 'ok', 'compartment': compartment}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+
+
+# print receipt on thermal printer
+@app.route('/api/print/receipt', methods=['POST'])
+def print_receipt():
+    data = request.get_json(silent=True)
+    if not data or 'order_id' not in data:
+        return jsonify({'error': 'Order ID required'}), 400
+
+    order_id = data['order_id']
+    cur = mysql.connection.cursor()
+    try:
+        # fetch order + user info
+        cur.execute(
+            'SELECT o.product_name, o.amount, o.compartment_number, o.birthdate, '
+            '       u.name, o.pharmacy_id '
+            'FROM orders o '
+            'LEFT JOIN users u ON o.user_id = u.id '
+            'WHERE o.id = %s',
+            (order_id,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({'error': 'Order not found'}), 404
+
+        product_name = row[0] or '—'
+        amount = row[1] or 0
+        compartment = row[2]
+        birthdate = row[3] or '—'
+        patient_name = row[4] or 'Klant'
+        pharmacy_id = row[5] or PHARMACY_NAME
+
+        # use pharmacy name from env if available, else fallback
+        pharmacy = PHARMACY_NAME
+
+        today = datetime.now().strftime('%d-%m-%Y')
+
+        # build receipt text
+        lines = [
+            pharmacy,
+            '',
+            f'Datum: {today}',
+            f'Naam: {patient_name}',
+            '',
+            'Medicijnen:',
+            f'  {product_name} x{amount}',
+            '',
+        ]
+        if compartment is not None:
+            lines.append(f'Vak: {compartment}')
+        lines.extend(['', '---- Ei\[nd bonnetje ----', '', '', '', ''])
+
+        receipt_text = '\n'.join(lines)
+
+        # send to printer
+        try:
+            ser = serial.Serial(PRINTER_PORT, PRINTER_BAUD, timeout=1)
+            try:
+                ser.write(b'\x1b\x40')  # ESC @ — init printer
+                for char in receipt_text.encode('latin-1'):
+                    ser.write(bytes([char]))
+                ser.write(b'\x1d\x56\x01')  # GS V 1 — cut paper
+            finally:
+                ser.close()
+        except serial.SerialException as se:
+            # printer unavailable — still return ok so UX isn't broken
+            return jsonify({'status': 'ok', 'warning': str(se)}), 200
+
+        return jsonify({'status': 'ok'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
