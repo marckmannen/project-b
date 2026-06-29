@@ -3,7 +3,6 @@ from flask_mysqldb import MySQL
 from flask.json.provider import DefaultJSONProvider
 from dotenv import load_dotenv
 import os
-import json
 import serial
 from datetime import date, datetime
 
