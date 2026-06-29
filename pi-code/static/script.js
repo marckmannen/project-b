@@ -351,16 +351,6 @@ async function printLeaflet() {
     btn.disabled = false;
   }
 }
-      body: JSON.stringify({ order_id: currentPickupOrderId })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showError(data.error || 'Afdrukken mislukt');
-    }
-  } catch (e) {
-    showError('Verbindingsfout, probeer opnieuw.');
-  }
-}
 
 // inactivity timeout
 function resetInactivityTimer() {
