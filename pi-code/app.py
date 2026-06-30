@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import os
 import threading
 import time
+import unicodedata
 from datetime import date, datetime
 
 try:
@@ -66,6 +67,15 @@ def get_printer_port_candidates():
             candidates.append(port)
 
     return candidates
+
+
+def sanitize_print_text(value):
+    if value is None:
+        return ''
+    if not isinstance(value, str):
+        value = str(value)
+    normalized = unicodedata.normalize('NFKD', value)
+    return normalized.encode('ascii', 'replace').decode('ascii')
 
 
 def ensure_serial_connection():
@@ -424,16 +434,17 @@ def print_receipt():
         if not row:
             return jsonify({'error': 'Order not found'}), 404
 
-        product_name = row[0] or '—'
+        product_name = sanitize_print_text(row[0] or 'Medicijn')
         amount = row[1] or 0
         compartment = row[2]
         patient_name = 'Klant'
+        pharmacy_name = sanitize_print_text(PHARMACY_NAME)
 
         today = datetime.now().strftime('%d-%m-%Y')
 
         # build receipt text
         lines = [
-            PHARMACY_NAME,
+            pharmacy_name,
             '',
             f'Datum: {today}',
             f'Naam: {patient_name}',
@@ -465,28 +476,23 @@ def print_receipt():
             with serial_lock:
                 time.sleep(1.5)  # let the Arduino/translator settle before sending ESC/POS data
                 conn.write(b'\x1b\x40')  # ESC @ — init printer
-                conn.write(f'---{PHARMACY_NAME}---\n'.encode('latin-1'))
-                conn.write(f'Medicijnen:\n'.encode('latin-1'))
-                conn.write(f'    - {product_name} {amount}x\n'.encode('latin-1'))
-                conn.write(b'\n')
-                conn.write(f'Naam: {patient_name}\n'.encode('latin-1'))
-                conn.write(f'Datum: {today}\n'.encode('latin-1'))
-                conn.write(b'\x1b\x64\x03')  # ESC d 3 — feed 3 lines
+                conn.write(f'---{pharmacy_name}---\r\n'.encode('ascii', 'replace'))
+                conn.write(b'Medicijnen:\r\n')
+                conn.write(f'    - {product_name} {amount}x\r\n'.encode('ascii', 'replace'))
+                conn.write(b'\r\n')
+                conn.write(f'Naam: {patient_name}\r\n'.encode('ascii', 'replace'))
+                conn.write(f'Datum: {today}\r\n'.encode('ascii', 'replace'))
+                conn.write(b'\r\n\r\n')
+                conn.write(b'\x1b\x64\x06')  # ESC d 6 — feed 6 lines for an easier tear-off
                 conn.flush()
         except (serial.SerialException, OSError) as exc:
             error_msg = str(exc)
             app.logger.error(
                 'Printer write failed on %s: %s',
-                selected_port,
+                PRINTER_PORT,
                 error_msg,
             )
             return jsonify({'error': 'Printer error', 'details': error_msg}), 500
-        finally:
-            if ser is not None:
-                try:
-                    ser.close()
-                except Exception:
-                    pass
         
         # also set order to completed on successful print
         try:
