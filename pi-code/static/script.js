@@ -6,6 +6,7 @@ let dateBuffer = '';   // flat string ddmyyyy
 // user orders
 let userOrders = [];
 let currentPickupOrderId = null; // track which order was picked up for printing
+let qrPollInterval = null;
 
 // dispensing timer
 const DISPENSING_DURATION = 10; // seconds
@@ -156,7 +157,6 @@ function goTo(id) {
   if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
   if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
 
-
   hideTimeoutModal();
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -166,7 +166,50 @@ function goTo(id) {
     startDispensingTimer();
   }
 
+  if (id === 'page-qr') {
+    startQrPolling();
+  } else {
+    stopQrPolling();
+  }
+
   resetInactivityTimer();
+}
+
+function startQrPolling() {
+  if (qrPollInterval) {
+    return;
+  }
+  const statusEl = document.getElementById('scan-code');
+  if (statusEl) {
+    statusEl.textContent = '';
+  }
+  checkQrScan();
+  qrPollInterval = setInterval(checkQrScan, 1000);
+}
+
+function stopQrPolling() {
+  if (qrPollInterval) {
+    clearInterval(qrPollInterval);
+    qrPollInterval = null;
+  }
+}
+
+async function checkQrScan() {
+  try {
+    const res = await fetch('/api/qr/scan');
+    const data = await res.json();
+    if (res.ok && data.qr_code) {
+      const code = data.qr_code;
+      const statusEl = document.getElementById('scan-code');
+      if (statusEl) {
+        statusEl.textContent = 'Scan: ' + code;
+      }
+      loginUserByPin(code);
+      stopQrPolling();
+    }
+  } catch (e) {
+    // ignore polling errors; the page will keep checking
+  }
 }
 
 // pin logic
@@ -246,12 +289,6 @@ function dateReset() {
   dateBuffer = '';
   dateFields();
 }
-
-// simulate qr scan after 3 seconds on qr page
-document.getElementById('page-qr').addEventListener('click', function() {
-  resetInactivityTimer();
-  goTo('page-dispensing');
-});
 
 // dispensing timer
 function startDispensingTimer() {

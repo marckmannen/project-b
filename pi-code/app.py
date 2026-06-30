@@ -3,6 +3,7 @@ from flask_mysqldb import MySQL
 from flask.json.provider import DefaultJSONProvider
 from dotenv import load_dotenv
 import os
+import threading
 import time
 from datetime import date, datetime
 
@@ -18,10 +19,16 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'defaultsecretkey')
 
-# receipt printer config
+# receipt printer / scanner config
 PRINTER_PORT = os.getenv('PRINTER_PORT', '/dev/ttyACM0')
 PRINTER_BAUD = int(os.getenv('PRINTER_BAUD', '9600'))
 PHARMACY_NAME = os.getenv('PHARMACY_NAME', 'Medicijnkluis')
+
+serial_connection = None
+serial_lock = threading.Lock()
+latest_qr_code = None
+serial_thread = None
+serial_stop_event = threading.Event()
 
 
 def get_available_serial_ports():
@@ -59,6 +66,71 @@ def get_printer_port_candidates():
             candidates.append(port)
 
     return candidates
+
+
+def ensure_serial_connection():
+    global serial_connection
+    if serial_connection and serial_connection.is_open:
+        return serial_connection
+    if serial is None:
+        return None
+    try:
+        serial_connection = serial.Serial(PRINTER_PORT, PRINTER_BAUD, timeout=1)
+        app.logger.info('Opened serial port %s for printer/scanner', PRINTER_PORT)
+        return serial_connection
+    except Exception as e:
+        app.logger.error('Unable to open serial port %s: %s', PRINTER_PORT, e)
+        serial_connection = None
+        return None
+
+
+def serial_reader_loop():
+    global latest_qr_code, serial_connection
+    while not serial_stop_event.is_set():
+        conn = ensure_serial_connection()
+        if conn is None:
+            time.sleep(1)
+            continue
+
+        try:
+            line = conn.readline()
+            if not line:
+                continue
+            try:
+                text = line.decode('utf-8', errors='ignore').strip()
+            except Exception:
+                continue
+
+            if text.startswith('SCAN:'):
+                code = text.split('SCAN:', 1)[1].strip()
+                if code:
+                    latest_qr_code = code
+                    app.logger.info('QR code scanned: %s', code)
+        except Exception as e:
+            app.logger.error('Serial reader error: %s', e)
+            time.sleep(1)
+
+
+def start_serial_thread():
+    global serial_thread
+    if serial_thread is not None:
+        return
+    if serial is None:
+        app.logger.warning('pyserial is not installed; QR scanning disabled')
+        return
+
+    # open connection now so the scanner thread can read immediately
+    ensure_serial_connection()
+    serial_thread = threading.Thread(target=serial_reader_loop, daemon=True)
+    serial_thread.start()
+
+
+@app.route('/api/qr/scan', methods=['GET'])
+def qr_scan():
+    global latest_qr_code
+    code = latest_qr_code
+    latest_qr_code = None
+    return jsonify({'qr_code': code}), 200
 
 
 class CustomJSONProvider(DefaultJSONProvider):
@@ -270,9 +342,13 @@ def user_login():
 
     pincode = data.get('pincode')
     birthdate = data.get('birthdate')   # expected: 'YYYY-MM-DD'
+    qr_code = data.get('qr_code')
 
-    if not pincode and not birthdate:
+    if not pincode and not birthdate and not qr_code:
         return jsonify({'error': 'No credentials provided'}), 400
+
+    if qr_code and not pincode:
+        pincode = qr_code
 
     cur = mysql.connection.cursor()
     try:
@@ -376,52 +452,27 @@ def print_receipt():
         if serial is None:
             return jsonify({'error': 'Printer support is unavailable. Install pyserial first.'}), 500
 
-        available_ports = get_available_serial_ports()
-        last_error = None
-        selected_port = None
-        ser = None
-
-        for candidate in get_printer_port_candidates():
-            try:
-                ser = serial.Serial(candidate, PRINTER_BAUD, timeout=2)
-                selected_port = candidate
-                break
-            except (serial.SerialException, OSError) as exc:
-                last_error = exc
-                continue
-
-        if ser is None:
-            error_msg = str(last_error) if last_error else 'No compatible printer port was found.'
-            if 'permission' in error_msg.lower() or 'access' in error_msg.lower():
-                error_msg = (
-                    f'No permission to access {PRINTER_PORT}. '
-                    f'Fix: sudo usermod -a -G dialout pi && sudo reboot '
-                    f'(or add your user to the dialout group)'
-                )
-            app.logger.error(
-                'Printer failed. configured_port=%s available_ports=%s error=%s',
-                PRINTER_PORT,
-                available_ports,
-                error_msg,
-            )
+        conn = ensure_serial_connection()
+        if conn is None:
             return jsonify({
                 'error': 'Printer error',
-                'details': error_msg,
+                'details': f'Unable to open serial port {PRINTER_PORT}.',
                 'configured_port': PRINTER_PORT,
-                'available_ports': available_ports,
+                'available_ports': get_available_serial_ports(),
             }), 500
 
         try:
-            time.sleep(1.5)  # let the Arduino/translator settle before sending ESC/POS data
-            ser.write(b'\x1b\x40')  # ESC @ — init printer
-            ser.write(f'---{PHARMACY_NAME}---\n'.encode('latin-1'))
-            ser.write(f'Medicijnen:\n'.encode('latin-1'))
-            ser.write(f'    - {product_name} {amount}x\n'.encode('latin-1'))
-            ser.write(b'\n')
-            ser.write(f'Naam: {patient_name}\n'.encode('latin-1'))
-            ser.write(f'Datum: {today}\n'.encode('latin-1'))
-            ser.write(b'\x1b\x64\x03')  # ESC d 3 — feed 3 lines
-            ser.flush()
+            with serial_lock:
+                time.sleep(1.5)  # let the Arduino/translator settle before sending ESC/POS data
+                conn.write(b'\x1b\x40')  # ESC @ — init printer
+                conn.write(f'---{PHARMACY_NAME}---\n'.encode('latin-1'))
+                conn.write(f'Medicijnen:\n'.encode('latin-1'))
+                conn.write(f'    - {product_name} {amount}x\n'.encode('latin-1'))
+                conn.write(b'\n')
+                conn.write(f'Naam: {patient_name}\n'.encode('latin-1'))
+                conn.write(f'Datum: {today}\n'.encode('latin-1'))
+                conn.write(b'\x1b\x64\x03')  # ESC d 3 — feed 3 lines
+                conn.flush()
         except (serial.SerialException, OSError) as exc:
             error_msg = str(exc)
             app.logger.error(
@@ -470,4 +521,5 @@ def user_complete(order_id):
 
 
 if __name__ == '__main__':
+    start_serial_thread()
     app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)

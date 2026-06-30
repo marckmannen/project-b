@@ -490,6 +490,23 @@ body {
   line-height: 1.5;
   max-width: 600px;
   text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.scan-code {
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--navy);
+  border-radius: 8px;
+  padding: 18px 22px;
+  font-size: clamp(20px, 2.5vw, 28px);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* dispensing page */
