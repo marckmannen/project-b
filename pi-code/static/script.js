@@ -339,7 +339,15 @@ async function printLeaflet() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ order_id: currentPickupOrderId })
     });
-    const data = await res.json();
+
+    const text = await res.text();
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { error: text || 'Afdrukken mislukt' };
+    }
+
     if (!res.ok) {
       showError(data.details || data.error || 'Afdrukken mislukt');
       btn.textContent = 'Opnieuw proberen';

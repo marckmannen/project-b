@@ -339,13 +339,9 @@ def print_receipt():
     order_id = data['order_id']
     cur = mysql.connection.cursor()
     try:
-        # fetch order + user info
+        # fetch order details directly from the orders table
         cur.execute(
-            'SELECT o.product_name, o.amount, o.compartment_number, o.birthdate, '
-            '       u.name '
-            'FROM orders o '
-            'LEFT JOIN users u ON o.user_id = u.id '
-            'WHERE o.id = %s',
+            'SELECT product_name, amount, compartment_number FROM orders WHERE id = %s',
             (order_id,)
         )
         row = cur.fetchone()
@@ -355,7 +351,7 @@ def print_receipt():
         product_name = row[0] or '—'
         amount = row[1] or 0
         compartment = row[2]
-        patient_name = row[4] or 'Klant'
+        patient_name = 'Klant'
 
         today = datetime.now().strftime('%d-%m-%Y')
 

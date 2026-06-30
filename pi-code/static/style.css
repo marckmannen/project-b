@@ -110,7 +110,7 @@ body {
   width: 100%;
   height: 100%;
   padding: 0;
-  overflow-y: auto;
+  overflow: hidden;
 }
 .page-header {
   background: var(--lavender);
@@ -128,6 +128,8 @@ body {
   justify-content: center;
   padding: 32px;
   gap: 40px;
+  overflow: hidden;
+  min-height: 0;
 }
 
 /* back arrow */
@@ -580,8 +582,8 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 32px;
-  padding: 48px 40px;
+  gap: 20px;
+  padding: 24px 28px;
 }
 .end-msg {
   background: var(--gray-input);
