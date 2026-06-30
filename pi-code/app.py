@@ -288,7 +288,7 @@ def admin_compartments():
                 'orders': [row for row in rows if row.get('compartment_number') == compartment_number]
             })
 
-        unassigned_orders = [row for row in rows if row.get('compartment_number') is None]
+        unassigned_orders = [row for row in rows if row.get('compartment_number') is None and str(row.get('status', '')).lower() == 'pending']
         return jsonify({
             'compartments': grouped,
             'unassigned_orders': unassigned_orders

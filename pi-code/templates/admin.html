@@ -187,8 +187,10 @@
 
         html += '<div class="compartment-assign">';
         html += '<select id="assign-order-' + compartment.number + '">';
-        html += '<option value="">Assign an order</option>';
-        orders.forEach(function(order) {
+        html += '<option value="">Assign a pending order</option>';
+        orders.filter(function(order) {
+          return (order.status || '').toLowerCase() === 'pending';
+        }).forEach(function(order) {
           const label = '#' + order.id + ' · ' + (order.product_name || 'Order') + ' · ' + (order.status || '—');
           html += '<option value="' + order.id + '">' + escapeAttr(label) + '</option>';
         });
