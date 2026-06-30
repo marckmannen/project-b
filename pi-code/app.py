@@ -412,9 +412,14 @@ def print_receipt():
             }), 500
 
         try:
+            time.sleep(1.5)  # let the Arduino/translator settle before sending ESC/POS data
             ser.write(b'\x1b\x40')  # ESC @ — init printer
-            ser.write(receipt_text.encode('latin-1'))
-            ser.flush()
+            ser.write(f'---{PHARMACY_NAME}---\n'.encode('latin-1'))
+            ser.write(f'Medicijnen:\n'.encode('latin-1'))
+            ser.write(f'    - {product_name} {amount}x\n'.encode('latin-1'))
+            ser.write(b'\n')
+            ser.write(f'Naam: {patient_name}\n'.encode('latin-1'))
+            ser.write(f'Datum: {today}\n'.encode('latin-1'))
             ser.write(b'\x1b\x64\x03')  # ESC d 3 — feed 3 lines
             ser.flush()
         except (serial.SerialException, OSError) as exc:
