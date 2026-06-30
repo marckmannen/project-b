@@ -740,3 +740,30 @@ body {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+.frontend-error {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: rgba(231, 76, 60, 0.96);
+  color: var(--white);
+  padding: 16px 24px;
+  border-radius: 10px;
+  font-size: clamp(16px, 2.1vw, 22px);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 20000;
+  text-align: center;
+  max-width: min(90vw, 900px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+}
+
+.frontend-error.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

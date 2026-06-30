@@ -466,7 +466,15 @@ async function loginUserByBirthdate(date) {
 }
 
 function showError(msg) {
-  // show a brief error toast
+  const banner = document.getElementById('frontend-error');
+  if (banner) {
+    banner.textContent = msg;
+    banner.classList.add('show');
+    clearTimeout(banner._hideTimer);
+    banner._hideTimer = setTimeout(() => banner.classList.remove('show'), 4000);
+  }
+
+  // also keep the brief toast for extra visibility
   let toast = document.getElementById('login-toast');
   if (!toast) {
     toast = document.createElement('div');
