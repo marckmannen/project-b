@@ -459,9 +459,9 @@ def print_receipt():
     order_id = data['order_id']
     cur = mysql.connection.cursor()
     try:
-        # fetch order details directly from the orders table
+        # fetch order details and customer name from the users table
         cur.execute(
-            'SELECT product_name, amount, compartment_number FROM orders WHERE id = %s',
+            'SELECT o.product_name, o.amount, o.compartment_number, o.order_id, u.name FROM orders o LEFT JOIN users u ON o.user_id = u.id WHERE o.id = %s',
             (order_id,)
         )
         row = cur.fetchone()
@@ -471,7 +471,8 @@ def print_receipt():
         product_name = sanitize_print_text(row[0] or 'Medicijn')
         amount = row[1] or 0
         compartment = row[2]
-        patient_name = 'Klant'
+        external_order_id = sanitize_print_text(str(row[3]) if row[3] else '')
+        customer_name = sanitize_print_text(row[4]) if row[4] else 'Klant'
         pharmacy_name = sanitize_print_text(PHARMACY_NAME)
 
         today = datetime.now().strftime('%d-%m-%Y')
@@ -481,7 +482,8 @@ def print_receipt():
             pharmacy_name,
             '',
             f'Datum: {today}',
-            f'Naam: {patient_name}',
+            f'Bestelling: {external_order_id}',
+            f'Naam: {customer_name}',
             '',
             'Medicijnen:',
             f'  {product_name} x{amount}',
@@ -514,7 +516,8 @@ def print_receipt():
                 conn.write(b'Medicijnen:\r\n')
                 conn.write(f'    - {product_name} {amount}x\r\n'.encode('ascii', 'replace'))
                 conn.write(b'\r\n')
-                conn.write(f'Naam: {patient_name}\r\n'.encode('ascii', 'replace'))
+                conn.write(f'Order: {external_order_id}\r\n'.encode('ascii', 'replace'))
+                conn.write(f'Naam: {customer_name}\r\n'.encode('ascii', 'replace'))
                 conn.write(f'Datum: {today}\r\n'.encode('ascii', 'replace'))
                 conn.write(b'\r\n\r\n')
                 conn.write(b'\x1b\x64\x03')  # ESC d 3 — feed 3 lines for a cleaner tear-off
