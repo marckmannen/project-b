@@ -483,7 +483,7 @@ def print_receipt():
                 conn.write(f'Naam: {patient_name}\r\n'.encode('ascii', 'replace'))
                 conn.write(f'Datum: {today}\r\n'.encode('ascii', 'replace'))
                 conn.write(b'\r\n\r\n')
-                conn.write(b'\x1b\x64\x06')  # ESC d 6 — feed 6 lines for an easier tear-off
+                conn.write(b'\x1b\x64\x03')  # ESC d 3 — feed 3 lines for a cleaner tear-off
                 conn.flush()
         except (serial.SerialException, OSError) as exc:
             error_msg = str(exc)
