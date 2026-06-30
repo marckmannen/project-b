@@ -340,6 +340,10 @@ def admin_edit_order(order_id):
             if k in data:
                 updates[k] = data[k]
 
+        # auto-sync status with compartment assignment
+        if 'compartment_number' in updates:
+            updates['status'] = 'ready' if updates['compartment_number'] is not None else 'pending'
+
         if not updates:
             return jsonify({'error': 'No valid fields to update'}), 400
 
