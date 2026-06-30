@@ -340,9 +340,20 @@ def admin_edit_order(order_id):
             if k in data:
                 updates[k] = data[k]
 
-        # auto-sync status with compartment assignment
+        # auto-sync status with compartment assignment (but don't pull completed orders back)
         if 'compartment_number' in updates:
-            updates['status'] = 'ready' if updates['compartment_number'] is not None else 'pending'
+            cur.execute(
+                f'SELECT status FROM `{ALLOWED_ADMIN_TABLE}` WHERE id = %s',
+                (order_id,)
+            )
+            current_row = cur.fetchone()
+            current_status = current_row[0] if current_row else None
+
+            if updates['compartment_number'] is not None:
+                updates['status'] = 'ready'
+            elif current_status != 'completed':
+                # only revert to pending if the order hasn't been completed yet
+                updates['status'] = 'pending'
 
         if not updates:
             return jsonify({'error': 'No valid fields to update'}), 400
