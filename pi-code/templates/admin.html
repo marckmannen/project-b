@@ -21,16 +21,33 @@
     </header>
 
     <main>
-      <div class="data-toolbar">
-        <div class="search-box">
-          <input type="text" id="search-input" placeholder="Filter orders...">
-        </div>
-        <span id="row-count" class="row-count"></span>
-      </div>
+      <nav class="admin-nav" aria-label="Admin sections">
+        <button class="nav-tab active" data-tab="orders-tab">Orders</button>
+        <button class="nav-tab" data-tab="compartments-tab">Compartments</button>
+      </nav>
 
-      <div id="orders-container" class="orders-list">
-        <div class="loading">Loading orders...</div>
-      </div>
+      <section id="orders-tab" class="tab-content active">
+        <div class="data-toolbar">
+          <div class="search-box">
+            <input type="text" id="search-input" placeholder="Filter orders...">
+          </div>
+          <span id="row-count" class="row-count"></span>
+        </div>
+
+        <div id="orders-container" class="orders-list">
+          <div class="loading">Loading orders...</div>
+        </div>
+      </section>
+
+      <section id="compartments-tab" class="tab-content">
+        <div class="tab-header">
+          <h2>Compartment overview</h2>
+          <span id="compartment-count" class="row-count">Loading compartments...</span>
+        </div>
+        <div id="compartments-container" class="compartment-grid">
+          <div class="loading">Loading compartments...</div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -71,6 +88,7 @@
     let compartments = [1, 2, 3, 4];
     let statuses = ['pending', 'ready', 'completed', 'cancelled'];
     let expandedOrder = null; // track which order is expanded
+    let compartmentsData = { compartments: [], unassigned_orders: [] };
 
     async function apiFetch(url, options = {}) {
       const res = await fetch(url, { credentials: 'same-origin', ...options });
@@ -104,12 +122,119 @@
         const data = await apiFetch('/api/admin/orders');
         orders = data;
         renderOrders(orders);
+        renderCompartments(compartmentsData);
         document.getElementById('row-count').textContent = orders.length + ' orders';
       } catch (err) {
         container.innerHTML = '<div class="error-state">' + err.message + '</div>';
       }
     }
 
+    async function loadCompartments() {
+      const container = document.getElementById('compartments-container');
+      try {
+        const data = await apiFetch('/api/admin/compartments');
+        compartmentsData = data || { compartments: [], unassigned_orders: [] };
+        renderCompartments(compartmentsData);
+        document.getElementById('compartment-count').textContent = (compartmentsData.compartments || []).length + ' compartments';
+      } catch (err) {
+        container.innerHTML = '<div class="error-state">' + err.message + '</div>';
+      }
+    }
+
+    function renderCompartments(data) {
+      const container = document.getElementById('compartments-container');
+      const items = data && data.compartments ? data.compartments : [];
+      if (!items.length) {
+        container.innerHTML = '<div class="empty-state">No compartments available</div>';
+        return;
+      }
+
+      let html = '';
+      if (data.unassigned_orders && data.unassigned_orders.length) {
+        const unassignedBadges = data.unassigned_orders.map(function(order) {
+          return '<span class="unassigned-pill">#' + escapeAttr(order.id) + ' ' + escapeAttr(order.product_name || 'Order') + '</span>';
+        }).join('');
+        html += '<div class="compartment-summary">';
+        html += '<h3>Unassigned orders</h3>';
+        html += '<div class="unassigned-list">' + unassignedBadges + '</div>';
+        html += '</div>';
+      }
+
+      items.forEach(function(compartment) {
+        const ordersInCompartment = compartment.orders || [];
+        const orderRows = ordersInCompartment.map(function(order) {
+          return '<div class="compartment-order">' +
+            '<div class="compartment-order-main">' +
+            '<strong>#' + escapeAttr(order.id) + '</strong>' +
+            '<span>' + escapeAttr(order.product_name || 'Order') + '</span>' +
+            '<span class="status-badge ' + escapeAttr((order.status || '').toLowerCase()) + '">' + escapeAttr(order.status || '—') + '</span>' +
+            '</div>' +
+            '<button class="btn btn-ghost btn-sm" onclick="clearCompartmentAssignment(' + order.id + ')">Clear</button>' +
+            '</div>';
+        }).join('');
+
+        html += '<div class="compartment-card">';
+        html += '<div class="compartment-card-header">';
+        html += '<h3>Compartment ' + escapeAttr(compartment.number) + '</h3>';
+        html += '<span class="compartment-count">' + ordersInCompartment.length + ' order' + (ordersInCompartment.length === 1 ? '' : 's') + '</span>';
+        html += '</div>';
+
+        if (ordersInCompartment.length) {
+          html += '<div class="compartment-orders">' + orderRows + '</div>';
+        } else {
+          html += '<div class="compartment-empty">No orders assigned yet</div>';
+        }
+
+        html += '<div class="compartment-assign">';
+        html += '<select id="assign-order-' + compartment.number + '">';
+        html += '<option value="">Assign an order</option>';
+        orders.forEach(function(order) {
+          const label = '#' + order.id + ' · ' + (order.product_name || 'Order') + ' · ' + (order.status || '—');
+          html += '<option value="' + order.id + '">' + escapeAttr(label) + '</option>';
+        });
+        html += '</select>';
+        html += '<button class="btn btn-sm" onclick="assignOrderToCompartment(' + compartment.number + ')">Assign</button>';
+        html += '</div>';
+        html += '</div>';
+      });
+
+      container.innerHTML = html;
+    }
+
+    async function assignOrderToCompartment(compartmentNumber) {
+      const select = document.getElementById('assign-order-' + compartmentNumber);
+      const orderId = select ? select.value : '';
+      if (!orderId) {
+        alert('Select an order to assign first.');
+        return;
+      }
+
+      try {
+        await apiFetch('/api/admin/orders/' + orderId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ compartment_number: parseInt(compartmentNumber, 10) })
+        });
+        await loadOrders();
+        await loadCompartments();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function clearCompartmentAssignment(orderId) {
+      try {
+        await apiFetch('/api/admin/orders/' + orderId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ compartment_number: null })
+        });
+        await loadOrders();
+        await loadCompartments();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
 
     function statusBadge(status) {
       if (!status) return '<span class="status-badge empty">—</span>';
@@ -180,7 +305,10 @@
       document.getElementById('row-count').textContent = filtered.length + ' of ' + orders.length;
     });
 
-    document.getElementById('refresh-btn').addEventListener('click', loadOrders);
+    document.getElementById('refresh-btn').addEventListener('click', function() {
+      loadOrders();
+      loadCompartments();
+    });
 
     document.getElementById('logout-btn').addEventListener('click', async function() {
       await fetch('/admin/logout', { method: 'POST', credentials: 'same-origin' });
@@ -259,6 +387,21 @@
       }
     }
 
+    function setActiveTab(tabId) {
+      document.querySelectorAll('.nav-tab').forEach(function(tab) {
+        tab.classList.toggle('active', tab.dataset.tab === tabId);
+      });
+      document.querySelectorAll('.tab-content').forEach(function(section) {
+        section.classList.toggle('active', section.id === tabId);
+      });
+    }
+
+    document.querySelectorAll('.nav-tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        setActiveTab(this.dataset.tab);
+      });
+    });
+
     function escapeAttr(val) {
       if (val === null || val === undefined) return '';
       if (typeof val === 'object') val = JSON.stringify(val);
@@ -268,6 +411,7 @@
     checkDbStatus();
     loadOptions();
     loadOrders();
+    loadCompartments();
   </script>
 </body>
 </html>

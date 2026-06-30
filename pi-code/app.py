@@ -269,6 +269,36 @@ def admin_options():
     }), 200
 
 
+@app.route('/api/admin/compartments', methods=['GET'])
+def admin_compartments():
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute(
+            f'SELECT id, order_id, product_id, product_name, amount, compartment_number, status, pincode, birthdate, created_at, updated_at FROM `{ALLOWED_ADMIN_TABLE}` ORDER BY (compartment_number IS NULL), compartment_number, id'
+        )
+        rows = cursor_to_dicts(cur)
+        compartment_numbers = [1, 2, 3, 4]
+        grouped = []
+        for compartment_number in compartment_numbers:
+            grouped.append({
+                'number': compartment_number,
+                'orders': [row for row in rows if row.get('compartment_number') == compartment_number]
+            })
+
+        unassigned_orders = [row for row in rows if row.get('compartment_number') is None]
+        return jsonify({
+            'compartments': grouped,
+            'unassigned_orders': unassigned_orders
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+
+
 # admin orders read
 @app.route('/api/admin/orders', methods=['GET'])
 def admin_orders():
