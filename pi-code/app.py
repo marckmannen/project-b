@@ -3,9 +3,15 @@ from flask_mysqldb import MySQL
 from flask.json.provider import DefaultJSONProvider
 from dotenv import load_dotenv
 import os
-import serial
 import time
 from datetime import date, datetime
+
+try:
+    import serial
+    from serial.tools import list_ports
+except ImportError:
+    serial = None
+    list_ports = None
 
 load_dotenv()
 
@@ -16,6 +22,43 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'defaultsecretkey')
 PRINTER_PORT = os.getenv('PRINTER_PORT', '/dev/ttyACM0')
 PRINTER_BAUD = int(os.getenv('PRINTER_BAUD', '9600'))
 PHARMACY_NAME = os.getenv('PHARMACY_NAME', 'Medicijnkluis')
+
+
+def get_available_serial_ports():
+    if not list_ports:
+        return []
+    try:
+        return [port.device for port in list_ports.comports()]
+    except Exception:
+        return []
+
+
+def get_printer_port_candidates():
+    candidates = []
+    configured_port = (os.getenv('PRINTER_PORT', '') or '').strip()
+    if configured_port:
+        candidates.append(configured_port)
+
+    for candidate in [
+        '/dev/ttyUSB0',
+        '/dev/ttyACM0',
+        '/dev/ttyAMA0',
+        '/dev/serial0',
+        'COM1',
+        'COM2',
+        'COM3',
+        'COM4',
+        'COM5',
+        'COM6',
+    ]:
+        if candidate not in candidates:
+            candidates.append(candidate)
+
+    for port in get_available_serial_ports():
+        if port not in candidates:
+            candidates.append(port)
+
+    return candidates
 
 
 class CustomJSONProvider(DefaultJSONProvider):
@@ -334,28 +377,64 @@ def print_receipt():
         receipt_text = '\n'.join(lines)
 
         # send to printer
-        try:
-            ser = serial.Serial(PRINTER_PORT, PRINTER_BAUD, timeout=2)
+        if serial is None:
+            return jsonify({'error': 'Printer support is unavailable. Install pyserial first.'}), 500
+
+        available_ports = get_available_serial_ports()
+        last_error = None
+        selected_port = None
+        ser = None
+
+        for candidate in get_printer_port_candidates():
             try:
-                ser.write(b'\x1b\x40')  # ESC @ — init printer
-                ser.write(receipt_text.encode('latin-1'))
-                ser.flush()
-                ser.write(b'\x1b\x64\x03')  # ESC d 3 — feed 3 lines
-                ser.flush()
-            finally:
-                ser.close()
-        except serial.SerialException as se:
-            # PermissionError? Give helpful message
-            error_msg = str(se)
+                ser = serial.Serial(candidate, PRINTER_BAUD, timeout=2)
+                selected_port = candidate
+                break
+            except (serial.SerialException, OSError) as exc:
+                last_error = exc
+                continue
+
+        if ser is None:
+            error_msg = str(last_error) if last_error else 'No compatible printer port was found.'
             if 'permission' in error_msg.lower() or 'access' in error_msg.lower():
                 error_msg = (
                     f'No permission to access {PRINTER_PORT}. '
-                    f'Fix: sudo usermod -a -G dialout pi && sudo reboot  '
-                    f'(or add your user to dialout group)'
+                    f'Fix: sudo usermod -a -G dialout pi && sudo reboot '
+                    f'(or add your user to the dialout group)'
                 )
-            return jsonify({'error': f'Printer error: {error_msg}'}), 500
-        except Exception as pe:
-            return jsonify({'error': f'Print failed: {str(pe)}'}), 500
+            app.logger.error(
+                'Printer failed. configured_port=%s available_ports=%s error=%s',
+                PRINTER_PORT,
+                available_ports,
+                error_msg,
+            )
+            return jsonify({
+                'error': 'Printer error',
+                'details': error_msg,
+                'configured_port': PRINTER_PORT,
+                'available_ports': available_ports,
+            }), 500
+
+        try:
+            ser.write(b'\x1b\x40')  # ESC @ — init printer
+            ser.write(receipt_text.encode('latin-1'))
+            ser.flush()
+            ser.write(b'\x1b\x64\x03')  # ESC d 3 — feed 3 lines
+            ser.flush()
+        except (serial.SerialException, OSError) as exc:
+            error_msg = str(exc)
+            app.logger.error(
+                'Printer write failed on %s: %s',
+                selected_port,
+                error_msg,
+            )
+            return jsonify({'error': 'Printer error', 'details': error_msg}), 500
+        finally:
+            if ser is not None:
+                try:
+                    ser.close()
+                except Exception:
+                    pass
         
         # also set order to completed on successful print
         try:

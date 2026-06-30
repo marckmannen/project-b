@@ -341,7 +341,7 @@ async function printLeaflet() {
     });
     const data = await res.json();
     if (!res.ok) {
-      showError(data.error || 'Afdrukken mislukt');
+      showError(data.details || data.error || 'Afdrukken mislukt');
       btn.textContent = 'Opnieuw proberen';
       btn.disabled = false;
     }
