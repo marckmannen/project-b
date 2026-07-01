@@ -76,34 +76,38 @@ def create_servo(name, gpio, min_pw=SERVO_MIN_PWM, max_pw=SERVO_MAX_PWM, open_an
         return False
 
 
-def open_door(name='compartment'):
-    """Open a named door (default: compartment)."""
+# initialize the compartment servo door at startup
+create_servo('compartment', SERVO_GPIO)
+
+
+def open_door(name='compartment', angle=None):
+    """Open a named door (default: compartment). Pass angle to override global default."""
     sns = servos.get(name)
     if sns is None:
         app.logger.info('[door:%s] open requested (servo unavailable)', name)
         return False
     try:
-        servo_config = {'open_angle': SERVO_OPEN_ANGLE, 'close_angle': SERVO_CLOSE_ANGLE}
-        sns.angle = servo_config['open_angle']
+        target = angle if angle is not None else SERVO_OPEN_ANGLE
+        sns.angle = target
         door_states[name] = True
-        app.logger.info('[door:%s] opened', name)
+        app.logger.info('[door:%s] opened to %s degrees', name, target)
         return True
     except Exception as e:
         app.logger.error('[door:%s] open failed: %s', name, e)
         return False
 
 
-def close_door(name='compartment'):
-    """Close a named door (default: compartment)."""
+def close_door(name='compartment', angle=None):
+    """Close a named door (default: compartment). Pass angle to override global default."""
     sns = servos.get(name)
     if sns is None:
         app.logger.info('[door:%s] close requested (servo unavailable)', name)
         return False
     try:
-        servo_config = {'open_angle': SERVO_OPEN_ANGLE, 'close_angle': SERVO_CLOSE_ANGLE}
-        sns.angle = servo_config['close_angle']
+        target = angle if angle is not None else SERVO_CLOSE_ANGLE
+        sns.angle = target
         door_states[name] = False
-        app.logger.info('[door:%s] closed', name)
+        app.logger.info('[door:%s] closed to %s degrees', name, target)
         return True
     except Exception as e:
         app.logger.error('[door:%s] close failed: %s', name, e)
