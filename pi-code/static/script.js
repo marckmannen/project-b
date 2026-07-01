@@ -522,6 +522,10 @@ function showError(msg) {
   }
 }
 
+function showOrderNotReady() {
+  showError(T[lang].compartmentNotAssigned);
+}
+
 // ── Render User Orders ──
 function renderUserOrders(orders) {
   const container = document.getElementById('orders-list');
@@ -542,8 +546,10 @@ function renderUserOrders(orders) {
     const statusClass = order.status ? 'status-badge ' + order.status.toLowerCase() : '';
     const isReady = order.status === 'ready';
     const hasCompartment = order.compartment_number != null;
+    const canPickUp = isReady && hasCompartment;
+    const clickAction = canPickUp ? 'pickUpOrder(' + order.id + ')' : 'showOrderNotReady()';
 
-    html += '<div class="user-order-card' + (isReady && hasCompartment ? '' : ' locked') + '" onclick="' + (isReady && hasCompartment ? 'pickUpOrder(' + order.id + ')' : "showError(T[lang].compartmentNotAssigned)") + '">',
+    html += '<div class="user-order-card' + (canPickUp ? '' : ' locked') + '" onclick="' + clickAction + '">';
     html += '<div class="order-info">';
     html += '<div class="order-product">' + escapeXml(order.product_name || '—') + '</div>';
     html += '<div class="order-meta">';
