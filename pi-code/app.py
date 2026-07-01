@@ -59,10 +59,8 @@ def create_servo(name, gpio, min_pw=SERVO_MIN_PWM, max_pw=SERVO_MAX_PWM, open_an
         app.logger.warning('[servo:%s] gpiozero not available on this system', name)
         return False
     try:
-        factory = PiGPIOFactory()
         sns = AngularServo(
             gpio,
-            factory=factory,
             min_pulse_width=min_pw,
             max_pulse_width=max_pw
         )
