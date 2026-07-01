@@ -50,7 +50,8 @@ const T = {
     timeoutMessage: 'Systeem wordt reset door inactiviteit.',
     timeoutSubtitle: 'Klik ergens om te heractiveren',
     ordersHeader: 'Uw openstaande orders',
-    ordersError: 'Geen openstaande orders gevonden.'
+    ordersError: 'Geen openstaande orders gevonden.',
+    compartmentNotAssigned: 'Vak nog niet toegewezen. Wacht alsjeblieft.'
   },
   en: {
     wTitle: 'Welcome',
@@ -79,7 +80,8 @@ const T = {
     timeoutMessage: 'Process will be stopped due to inactivity.',
     timeoutSubtitle: 'Click anywhere to cancel',
     ordersHeader: 'Your open orders',
-    ordersError: 'No open orders found.'
+    ordersError: 'No open orders found.',
+    compartmentNotAssigned: 'Compartment not assigned yet. Please wait.'
   }
 };
 
@@ -518,18 +520,6 @@ function showError(msg) {
     clearTimeout(banner._hideTimer);
     banner._hideTimer = setTimeout(() => banner.classList.remove('show'), 4000);
   }
-
-  // also keep the brief toast for extra visibility
-  let toast = document.getElementById('login-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'login-toast';
-    toast.className = 'login-toast';
-    document.body.appendChild(toast);
-  }
-  toast.textContent = msg;
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
 // ── Render User Orders ──
@@ -551,8 +541,9 @@ function renderUserOrders(orders) {
     const status = order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : '—';
     const statusClass = order.status ? 'status-badge ' + order.status.toLowerCase() : '';
     const isReady = order.status === 'ready';
+    const hasCompartment = order.compartment_number != null;
 
-    html += '<div class="user-order-card' + (isReady ? '' : ' locked') + '" onclick="' + (isReady ? 'pickUpOrder(' + order.id + ')' : 'showError(\'Order nog niet beschikbaar\')') + '">';
+    html += '<div class="user-order-card' + (isReady && hasCompartment ? '' : ' locked') + '" onclick="' + (isReady && hasCompartment ? 'pickUpOrder(' + order.id + ')' : "showError(T[lang].compartmentNotAssigned)") + '">',
     html += '<div class="order-info">';
     html += '<div class="order-product">' + escapeXml(order.product_name || '—') + '</div>';
     html += '<div class="order-meta">';
@@ -560,7 +551,7 @@ function renderUserOrders(orders) {
     html += '<span>' + compartment + '</span>';
     html += '</div></div>';
     html += '<div class="order-amount">' + order.amount + 'x</div>';
-    html += '<div class="order-arrow">' + (isReady ? '›' : '🔒') + '</div>';
+    html += '<div class="order-arrow">' + (isReady && hasCompartment ? '›' : '🔒') + '</div>';
     html += '</div>';
   });
   container.innerHTML = html;

@@ -450,6 +450,8 @@ def user_pickup(order_id):
             return jsonify({'error': 'Order is not available for pickup'}), 400
 
         compartment = row[1]
+        if compartment is None:
+            return jsonify({'error': 'Vak nog niet toegewezen / Compartment not assigned yet'}), 400
 
         # DO NOT change status yet - wait until user finishes
         # Status stays 'ready' during dispensing
