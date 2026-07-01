@@ -3,5 +3,6 @@ flask-mysqldb==2.0.0
 python-dotenv==1.1.0
 PyMySQL==1.1.1
 pyserial==3.5
+gpiozero
 smbus2
 websocket-client==1.9.0

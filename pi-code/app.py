@@ -48,54 +48,65 @@ serial_thread = None
 serial_stop_event = threading.Event()
 
 # servo door control
-servo = None
-door_open = False
+servos = {}  # name -> AngularServo instance
+door_states = {}  # name -> bool (open/closed)
 
-if GPIOZERO_AVAILABLE:
+
+def create_servo(name, gpio, min_pw=SERVO_MIN_PWM, max_pw=SERVO_MAX_PWM, open_angle=SERVO_OPEN_ANGLE, close_angle=SERVO_CLOSE_ANGLE):
+    """Initialize a named servo door instance. Call once per servo at startup."""
+    global servos, door_states
+    if not GPIOZERO_AVAILABLE or AngularServo is None:
+        app.logger.warning('[servo:%s] gpiozero not available on this system', name)
+        return False
     try:
         factory = PiGPIOFactory()
-        servo = AngularServo(
-            SERVO_GPIO,
+        sns = AngularServo(
+            gpio,
             factory=factory,
-            min_pulse_width=SERVO_MIN_PWM,
-            max_pulse_width=SERVO_MAX_PWM
+            min_pulse_width=min_pw,
+            max_pulse_width=max_pw
         )
-        servo.angle = SERVO_CLOSE_ANGLE  # ensure door is closed on startup
-        app.logger.info('Servo door initialized on GPIO %s', SERVO_GPIO)
-    except Exception as e:
-        app.logger.warning('Failed to initialize servo door: %s', e)
-        servo = None
-
-
-def open_door():
-    """Open the compartment door."""
-    global door_open
-    if servo is None:
-        app.logger.info('[door] open requested (servo unavailable on this system)')
-        return False
-    try:
-        servo.angle = SERVO_OPEN_ANGLE
-        door_open = True
-        app.logger.info('[door] opened')
+        sns.angle = close_angle
+        servos[name] = sns
+        door_states[name] = False
+        app.logger.info('[servo:%s] initialized on GPIO %s', name, gpio)
         return True
     except Exception as e:
-        app.logger.error('[door] open failed: %s', e)
+        app.logger.warning('[servo:%s] init failed: %s', name, e)
         return False
 
 
-def close_door():
-    """Close the compartment door."""
-    global door_open
-    if servo is None:
-        app.logger.info('[door] close requested (servo unavailable on this system)')
+def open_door(name='compartment'):
+    """Open a named door (default: compartment)."""
+    sns = servos.get(name)
+    if sns is None:
+        app.logger.info('[door:%s] open requested (servo unavailable)', name)
         return False
     try:
-        servo.angle = SERVO_CLOSE_ANGLE
-        door_open = False
-        app.logger.info('[door] closed')
+        servo_config = {'open_angle': SERVO_OPEN_ANGLE, 'close_angle': SERVO_CLOSE_ANGLE}
+        sns.angle = servo_config['open_angle']
+        door_states[name] = True
+        app.logger.info('[door:%s] opened', name)
         return True
     except Exception as e:
-        app.logger.error('[door] close failed: %s', e)
+        app.logger.error('[door:%s] open failed: %s', name, e)
+        return False
+
+
+def close_door(name='compartment'):
+    """Close a named door (default: compartment)."""
+    sns = servos.get(name)
+    if sns is None:
+        app.logger.info('[door:%s] close requested (servo unavailable)', name)
+        return False
+    try:
+        servo_config = {'open_angle': SERVO_OPEN_ANGLE, 'close_angle': SERVO_CLOSE_ANGLE}
+        sns.angle = servo_config['close_angle']
+        door_states[name] = False
+        app.logger.info('[door:%s] closed', name)
+        return True
+    except Exception as e:
+        app.logger.error('[door:%s] close failed: %s', name, e)
         return False
 
 
