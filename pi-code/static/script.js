@@ -51,7 +51,7 @@ const T = {
     timeoutSubtitle: 'Klik ergens om te heractiveren',
     ordersHeader: 'Uw openstaande orders',
     ordersError: 'Geen openstaande orders gevonden.',
-    compartmentNotAssigned: 'Vak nog niet toegewezen. Wacht alsjeblieft.'
+    compartmentNotAssigned: 'Vak nog niet toegewezen. Contacteer de apotheek.'
   },
   en: {
     wTitle: 'Welcome',
@@ -81,7 +81,7 @@ const T = {
     timeoutSubtitle: 'Click anywhere to cancel',
     ordersHeader: 'Your open orders',
     ordersError: 'No open orders found.',
-    compartmentNotAssigned: 'Compartment not assigned yet. Please wait.'
+    compartmentNotAssigned: 'Compartment not assigned yet. Please contact the pharmacy.'
   }
 };
 
