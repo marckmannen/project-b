@@ -15,6 +15,15 @@ except ImportError:
     serial = None
     list_ports = None
 
+try:
+    from gpiozero import AngularServo
+    from gpiozero.pins.pigpio import PiGPIOFactory
+    GPIOZERO_AVAILABLE = True
+except ImportError:
+    GPIOZERO_AVAILABLE = False
+    AngularServo = None
+    PiGPIOFactory = None
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -25,11 +34,69 @@ PRINTER_PORT = os.getenv('PRINTER_PORT', '/dev/ttyACM0')
 PRINTER_BAUD = int(os.getenv('PRINTER_BAUD', '9600'))
 PHARMACY_NAME = os.getenv('PHARMACY_NAME', 'Medicijnkluis')
 
+# servo door config
+SERVO_GPIO = int(os.getenv('SERVO_GPIO', '18'))
+SERVO_MIN_PWM = float(os.getenv('SERVO_MIN_PWM', '0.0006'))
+SERVO_MAX_PWM = float(os.getenv('SERVO_MAX_PWM', '0.0023'))
+SERVO_OPEN_ANGLE = float(os.getenv('SERVO_OPEN_ANGLE', '90'))
+SERVO_CLOSE_ANGLE = float(os.getenv('SERVO_CLOSE_ANGLE', '0'))
+
 serial_connection = None
 serial_lock = threading.Lock()
 latest_qr_code = None
 serial_thread = None
 serial_stop_event = threading.Event()
+
+# servo door control
+servo = None
+door_open = False
+
+if GPIOZERO_AVAILABLE:
+    try:
+        factory = PiGPIOFactory()
+        servo = AngularServo(
+            SERVO_GPIO,
+            factory=factory,
+            min_pulse_width=SERVO_MIN_PWM,
+            max_pulse_width=SERVO_MAX_PWM
+        )
+        servo.angle = SERVO_CLOSE_ANGLE  # ensure door is closed on startup
+        app.logger.info('Servo door initialized on GPIO %s', SERVO_GPIO)
+    except Exception as e:
+        app.logger.warning('Failed to initialize servo door: %s', e)
+        servo = None
+
+
+def open_door():
+    """Open the compartment door."""
+    global door_open
+    if servo is None:
+        app.logger.info('[door] open requested (servo unavailable on this system)')
+        return False
+    try:
+        servo.angle = SERVO_OPEN_ANGLE
+        door_open = True
+        app.logger.info('[door] opened')
+        return True
+    except Exception as e:
+        app.logger.error('[door] open failed: %s', e)
+        return False
+
+
+def close_door():
+    """Close the compartment door."""
+    global door_open
+    if servo is None:
+        app.logger.info('[door] close requested (servo unavailable on this system)')
+        return False
+    try:
+        servo.angle = SERVO_CLOSE_ANGLE
+        door_open = False
+        app.logger.info('[door] closed')
+        return True
+    except Exception as e:
+        app.logger.error('[door] close failed: %s', e)
+        return False
 
 
 def get_available_serial_ports():
@@ -453,6 +520,9 @@ def user_pickup(order_id):
         if compartment is None:
             return jsonify({'error': 'Vak nog niet toegewezen / Compartment not assigned yet'}), 400
 
+        # Open the compartment door via servo
+        open_door()
+
         # DO NOT change status yet - wait until user finishes
         # Status stays 'ready' during dispensing
         return jsonify({'status': 'ok', 'compartment': compartment}), 200
@@ -569,6 +639,10 @@ def user_complete(order_id):
             ('completed', order_id)
         )
         mysql.connection.commit()
+
+        # Close the compartment door
+        close_door()
+
         return jsonify({'status': 'ok'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
