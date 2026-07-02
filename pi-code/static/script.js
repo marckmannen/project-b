@@ -325,7 +325,7 @@ function updateTimerDisplay() {
   }
 }
 
-// stop process
+// stop process (normal manual stop — no status change)
 function stopProcess() {
   resetInactivityTimer();
 
@@ -340,6 +340,26 @@ function stopProcess() {
 
   // go to welcome page
   goTo('page-welcome');
+}
+
+// stop process due to inactivity timeout — marks order as failed and hard-reloads
+async function stopProcessByTimeout() {
+  // clear all timers
+  if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+  if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
+  hideTimeoutModal();
+
+  // mark order as failed to pick up
+  if (currentPickupOrderId) {
+    try {
+      await fetch('/api/user/failed_pickup/' + currentPickupOrderId, { method: 'POST' });
+    } catch (e) {
+      console.error('[timeout] error marking order failed:', e);
+    }
+  }
+
+  // hard reload the page (resets everything including receipt button)
+  window.location.reload();
 }
 
 // finish session (from end page)
@@ -433,7 +453,7 @@ function showTimeoutModal() {
 
     if (timeoutCountdownValue <= 0) {
       hideTimeoutModal();
-      stopProcess();
+      stopProcessByTimeout();
     }
   }, 1000);
 }

@@ -17,7 +17,10 @@ except ImportError:
 
 try:
     from gpiozero import AngularServo
-    from gpiozero.pins.pigpio import PiGPIOFactory
+    try:
+        from gpiozero.pins.pigpio import PiGPIOFactory
+    except ImportError:
+        PiGPIOFactory = None
     GPIOZERO_AVAILABLE = True
 except ImportError:
     GPIOZERO_AVAILABLE = False
@@ -650,6 +653,27 @@ def user_complete(order_id):
         cur.execute(
             f'UPDATE `{ALLOWED_ADMIN_TABLE}` SET status = %s WHERE id = %s',
             ('completed', order_id)
+        )
+        mysql.connection.commit()
+
+        # Close the compartment door
+        close_door()
+
+        return jsonify({'status': 'ok'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+
+
+# user failed to complete pickup (inactivity timeout — sets order to failed_to_pickup)
+@app.route('/api/user/failed_pickup/<int:order_id>', methods=['POST'])
+def user_failed_pickup(order_id):
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute(
+            f'UPDATE `{ALLOWED_ADMIN_TABLE}` SET status = %s WHERE id = %s',
+            ('failed_to_pickup', order_id)
         )
         mysql.connection.commit()
 
