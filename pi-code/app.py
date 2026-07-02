@@ -90,6 +90,8 @@ def open_door(name='compartment', angle=None):
     try:
         target = angle if angle is not None else SERVO_OPEN_ANGLE
         sns.angle = target
+        time.sleep(0.5)  # let the servo reach position
+        sns.pwm_stop()  # stop updating PWM — eliminates jitter while holding
         door_states[name] = True
         app.logger.info('[door:%s] opened to %s degrees', name, target)
         return True
@@ -107,6 +109,8 @@ def close_door(name='compartment', angle=None):
     try:
         target = angle if angle is not None else SERVO_CLOSE_ANGLE
         sns.angle = target
+        time.sleep(0.5)  # let the servo reach position
+        sns.pwm_stop()  # stop updating PWM — eliminates jitter while holding
         door_states[name] = False
         app.logger.info('[door:%s] closed to %s degrees', name, target)
         return True
