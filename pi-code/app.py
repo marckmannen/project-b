@@ -17,6 +17,7 @@ except ImportError:
 
 try:
     from gpiozero import AngularServo
+    from gpiozero.pins.lgpio import LGPIOPinFactory
     try:
         from gpiozero.pins.pigpio import PiGPIOFactory
     except ImportError:
@@ -25,6 +26,7 @@ try:
 except ImportError:
     GPIOZERO_AVAILABLE = False
     AngularServo = None
+    LGPIOPinFactory = None
     PiGPIOFactory = None
 
 load_dotenv()
@@ -62,13 +64,14 @@ def create_servo(name, gpio, min_pw=SERVO_MIN_PWM, max_pw=SERVO_MAX_PWM, open_an
         app.logger.warning('[servo:%s] gpiozero not available on this system', name)
         return False
     try:
+        factory = LGPIOPinFactory() if LGPIOPinFactory else None
         sns = AngularServo(
             gpio,
+            pin_factory=factory,
             min_pulse_width=min_pw,
             max_pulse_width=max_pw
         )
         sns.angle = close_angle
-        sns.stop()  # halt PWM immediately to prevent idle jitter
         servos[name] = sns
         door_states[name] = False
         app.logger.info('[servo:%s] initialized on GPIO %s', name, gpio)
@@ -92,7 +95,6 @@ def open_door(name='compartment', angle=None):
         target = angle if angle is not None else SERVO_OPEN_ANGLE
         sns.angle = target
         time.sleep(0.5)  # let the servo reach position
-        sns.stop()  # stop PWM to prevent jitter while holding
         door_states[name] = True
         app.logger.info('[door:%s] opened to %s degrees', name, target)
         return True
@@ -111,7 +113,6 @@ def close_door(name='compartment', angle=None):
         target = angle if angle is not None else SERVO_CLOSE_ANGLE
         sns.angle = target
         time.sleep(0.5)  # let the servo reach position
-        sns.stop()  # stop PWM to prevent jitter while holding
         door_states[name] = False
         app.logger.info('[door:%s] closed to %s degrees', name, target)
         return True
