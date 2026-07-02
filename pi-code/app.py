@@ -17,17 +17,10 @@ except ImportError:
 
 try:
     from gpiozero import AngularServo
-    from gpiozero.pins.lgpio import LGPIOPinFactory
-    try:
-        from gpiozero.pins.pigpio import PiGPIOFactory
-    except ImportError:
-        PiGPIOFactory = None
     GPIOZERO_AVAILABLE = True
 except ImportError:
     GPIOZERO_AVAILABLE = False
     AngularServo = None
-    LGPIOPinFactory = None
-    PiGPIOFactory = None
 
 load_dotenv()
 
@@ -64,10 +57,8 @@ def create_servo(name, gpio, min_pw=SERVO_MIN_PWM, max_pw=SERVO_MAX_PWM, open_an
         app.logger.warning('[servo:%s] gpiozero not available on this system', name)
         return False
     try:
-        factory = LGPIOPinFactory() if LGPIOPinFactory else None
         sns = AngularServo(
             gpio,
-            pin_factory=factory,
             min_pulse_width=min_pw,
             max_pulse_width=max_pw
         )
@@ -81,7 +72,7 @@ def create_servo(name, gpio, min_pw=SERVO_MIN_PWM, max_pw=SERVO_MAX_PWM, open_an
         return False
 
 
-# initialize the compartment servo door at startup
+# initialize the servo at startup
 create_servo('compartment', SERVO_GPIO)
 
 
