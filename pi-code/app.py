@@ -93,6 +93,7 @@ def create_stepper():
 
 def rotate_carousel(target_compartment, speed=STEPPER_STEP_DELAY, direction=1):
     """Spin the carousel to the target compartment (1-indexed) in a background thread."""
+    global carousel_ready
     if stepper_pins is None:
         app.logger.info('[carousel] rotation requested (stepper unavailable on this system)')
         return True  # don't block the request
