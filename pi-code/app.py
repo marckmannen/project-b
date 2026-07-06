@@ -17,11 +17,18 @@ except ImportError:
 
 try:
     from gpiozero import AngularServo, OutputDevice
+    try:
+        from gpiozero.pins.lgpio import LGPIOFactory
+        LGPIO_AVAILABLE = True
+    except ImportError:
+        LGPIO_AVAILABLE = False
+        LGPIOFactory = None
     GPIOZERO_AVAILABLE = True
 except ImportError:
     GPIOZERO_AVAILABLE = False
     AngularServo = None
     OutputDevice = None
+    LGPIOFactory = None
 
 load_dotenv()
 
@@ -49,8 +56,8 @@ latest_qr_code = None
 serial_thread = None
 serial_stop_event = threading.Event()
 
-# servo door control
-servos = {}  # name -> AngularServo instance
+# servo door control (lgpio hardware PWM, Pi 5 compatible, zero jitter)
+servo_door = None  # AngularServo instance
 door_states = {}  # name -> bool (open/closed)
 
 # stepper motor control (carousel)
@@ -138,24 +145,30 @@ def stepperMotor(duration_seconds, direction=1):
 
 
 def create_servo(name, gpio, min_pw=SERVO_MIN_PWM, max_pw=SERVO_MAX_PWM, open_angle=SERVO_OPEN_ANGLE, close_angle=SERVO_CLOSE_ANGLE):
-    """Initialize a named servo door instance. Call once per servo at startup."""
-    global servos, door_states
+    """Initialize servo with lgpio hardware PWM (zero jitter, Pi 5 compatible)."""
+    global servo_door
     if not GPIOZERO_AVAILABLE or AngularServo is None:
-        app.logger.warning('[servo:%s] gpiozero not available on this system', name)
+        app.logger.warning('[servo:%s] gpiozero not available', name)
         return False
     try:
-        sns = AngularServo(
+        factory = LGPIOFactory() if LGPIO_AVAILABLE and LGPIOFactory else None
+        app.logger.info('[servo:%s] using %s pin factory', name, 'lgpio' if factory else 'auto-detect')
+        servo_door = AngularServo(
             gpio,
+            min_angle=0,
+            max_angle=90,
             min_pulse_width=min_pw,
-            max_pulse_width=max_pw
+            max_pulse_width=max_pw,
+            pin_factory=factory
         )
-        sns.angle = close_angle
-        servos[name] = sns
+        # start closed
+        servo_door.angle = close_angle
         door_states[name] = False
-        app.logger.info('[servo:%s] initialized on GPIO %s', name, gpio)
+        app.logger.info('[servo:%s] initialized on GPIO %s (jitter-free)', name, gpio)
         return True
     except Exception as e:
-        app.logger.warning('[servo:%s] init failed: %s', name, e)
+        app.logger.warning('[servo:%s] init failed: %s', name, str(e))
+        servo_door = None
         return False
 
 
@@ -167,38 +180,34 @@ create_stepper()
 
 
 def open_door(name='compartment', angle=None):
-    """Open a named door (default: compartment). Pass angle to override global default."""
-    sns = servos.get(name)
-    if sns is None:
+    """Open the door servo with lgpio."""
+    if servo_door is None:
         app.logger.info('[door:%s] open requested (servo unavailable)', name)
         return False
     try:
         target = angle if angle is not None else SERVO_OPEN_ANGLE
-        sns.angle = target
-        time.sleep(0.5)  # let the servo reach position
+        servo_door.angle = target
         door_states[name] = True
-        app.logger.info('[door:%s] opened to %s degrees', name, target)
+        app.logger.info('[door:%s] opened to %s°', name, target)
         return True
     except Exception as e:
-        app.logger.error('[door:%s] open failed: %s', name, e)
+        app.logger.error('[door:%s] open failed: %s', name, str(e))
         return False
 
 
 def close_door(name='compartment', angle=None):
-    """Close a named door (default: compartment). Pass angle to override global default."""
-    sns = servos.get(name)
-    if sns is None:
+    """Close the door servo with lgpio."""
+    if servo_door is None:
         app.logger.info('[door:%s] close requested (servo unavailable)', name)
         return False
     try:
         target = angle if angle is not None else SERVO_CLOSE_ANGLE
-        sns.angle = target
-        time.sleep(0.5)  # let the servo reach position
+        servo_door.angle = target
         door_states[name] = False
-        app.logger.info('[door:%s] closed to %s degrees', name, target)
+        app.logger.info('[door:%s] closed to %s°', name, target)
         return True
     except Exception as e:
-        app.logger.error('[door:%s] close failed: %s', name, e)
+        app.logger.error('[door:%s] close failed: %s', name, str(e))
         return False
 
 
