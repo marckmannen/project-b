@@ -56,9 +56,7 @@ latest_qr_code = None
 serial_thread = None
 serial_stop_event = threading.Event()
 
-# servo door control (lgpio — lazy initialized on first use)
-lgpio_handle = None
-lgpio_initialized = False  # prevents double gpiochip_open
+# servo door control (lgpio — opens chip for ~20ms pulse only, then frees it for gpiozero)
 door_states = {}  # name -> bool (open/closed)
 
 # stepper motor control (carousel)
@@ -156,87 +154,75 @@ def stepperMotor(duration_seconds, direction=1):
 
 
 def create_servo(name='compartment', gpio=SERVO_GPIO):
-    """Initialize lgpio chip and claim servo GPIO."""
-    global lgpio_handle, lgpio_initialized
-    if not LGPIO_AVAILABLE or lgpio is None:
-        app.logger.info('[servo:%s] lgpio not available', name)
-        return False
-    if lgpio_initialized:
-        return True
-    try:
-        lgpio_handle = lgpio.gpiochip_open(0)
-        lgpio.gpio_claim_output(lgpio_handle, gpio)
-        lgpio_initialized = True
-        door_states[name] = False
-        app.logger.info('[servo:%s] initialized on GPIO %s', name, gpio)
-        return True
-    except Exception as e:
-        app.logger.warning('[servo:%s] init failed: %s', name, e)
-        lgpio_handle = None
-        return False
+    """Placeholder — servo uses open/close lgpio on each command (no persistent handle that blocks gpiozero)."""
+    door_states[name] = False
+    return True
 
 
 def _set_servo_angle(angle, gpio=SERVO_GPIO):
-    """Move servo to angle using lgpio tx_servo, then cut signal."""
-    if lgpio_handle is None:
+    """Move servo to angle, hold for travel time, then close chip."""
+    if not LGPIO_AVAILABLE or lgpio is None:
         return
+    handle = None
     try:
+        handle = lgpio.gpiochip_open(0)
+        lgpio.gpio_claim_output(handle, gpio)
         pulse_us = int(SERVO_MIN_PW_US + (angle / 90.0) * (SERVO_MAX_PW_US - SERVO_MIN_PW_US))
-        lgpio.tx_servo(lgpio_handle, gpio, pulse_us, SERVO_PWM_FREQ)
-        time.sleep(0.5)
-        lgpio.tx_servo(lgpio_handle, gpio, 0)  # cut PWM to prevent jitter
+        lgpio.tx_servo(handle, gpio, pulse_us, SERVO_PWM_FREQ)
+        time.sleep(0.6)  # hold chip open so servo can reach position
+        lgpio.tx_servo(handle, gpio, 0)  # cut signal cleanly before closing
     except Exception as e:
         app.logger.error('[servo] _set_servo_angle failed: %s', e)
+    finally:
+        if handle is not None:
+            lgpio.gpiochip_close(handle)
 
 
 def _stop_servo_pwm(gpio=SERVO_GPIO):
-    """Stop PWM on servo GPIO."""
-    if lgpio_handle is None:
+    """Stop PWM on servo GPIO (minimal chip hold time)."""
+    if not LGPIO_AVAILABLE or lgpio is None:
         return
+    handle = None
     try:
-        lgpio.tx_servo(lgpio_handle, gpio, 0)
+        handle = lgpio.gpiochip_open(0)
+        lgpio.gpio_claim_output(handle, gpio)
+        lgpio.tx_servo(handle, gpio, 0)
     except Exception as e:
         app.logger.error('[servo] _stop_servo_pwm failed: %s', e)
+    finally:
+        if handle is not None:
+            lgpio.gpiochip_close(handle)
 
 
-# initialize both at startup
-create_stepper()
-create_servo()
+# init stepper first (gpiozero gets priority on GPIO chip)
+_create_stepper_result = create_stepper()
+# servo lgpio opens/closes on each command — never blocks gpiozero
 
 
 def open_door(name='compartment', angle=None):
     """Open the door servo with lgpio tx_servo."""
-    if lgpio_handle is None:
+    if not LGPIO_AVAILABLE:
         app.logger.info('[door:%s] open requested (servo unavailable)', name)
         door_states[name] = True
         return True  # don't block the workflow
-    try:
-        target = angle if angle is not None else SERVO_OPEN_ANGLE
-        _set_servo_angle(target)
-        door_states[name] = True
-        app.logger.info('[door:%s] opened to %s°', name, target)
-        return True
-    except Exception as e:
-        app.logger.error('[door:%s] open failed: %s', name, str(e))
-        return False
+    target = angle if angle is not None else SERVO_OPEN_ANGLE
+    _set_servo_angle(target)
+    door_states[name] = True
+    app.logger.info('[door:%s] opened to %s°', name, target)
+    return True
 
 
 def close_door(name='compartment', angle=None):
     """Close the door servo with lgpio tx_servo."""
-    if lgpio_handle is None:
+    if not LGPIO_AVAILABLE:
         app.logger.info('[door:%s] close requested (servo unavailable)', name)
-        return False
-    try:
-        target = angle if angle is not None else SERVO_CLOSE_ANGLE
-        _set_servo_angle(target)
-        time.sleep(0.5)  # let servo reach position before cutting PWM
-        _stop_servo_pwm()  # cut PWM — no jitter while holding closed
-        door_states[name] = False
-        app.logger.info('[door:%s] closed to %s°', name, target)
         return True
-    except Exception as e:
-        app.logger.error('[door:%s] close failed: %s', name, str(e))
-        return False
+    target = angle if angle is not None else SERVO_CLOSE_ANGLE
+    _set_servo_angle(target)  # sends pulse and frees GPIO immediately
+
+    door_states[name] = False
+    app.logger.info('[door:%s] closed to %s°', name, target)
+    return True
 
 
 def get_available_serial_ports():
