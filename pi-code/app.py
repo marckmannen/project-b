@@ -56,13 +56,15 @@ latest_qr_code = None
 serial_thread = None
 serial_stop_event = threading.Event()
 
-# servo door control (lgpio hardware PWM via tx_servo — zero jitter)
+# servo door control (lgpio — lazy initialized on first use)
 lgpio_handle = None
+lgpio_initialized = False  # prevents double gpiochip_open
 door_states = {}  # name -> bool (open/closed)
 
 # stepper motor control (carousel)
 stepper_pins = None
 carousel_ready = True  # whether the carousel is accepting new rotation requests
+stepper_lock = threading.Lock()  # prevent concurrent stepper access
 
 STEPS_PER_COMPARTMENT = 9  # ~9 seconds at default step rate
 
@@ -90,25 +92,33 @@ def create_stepper():
 
 
 def rotate_carousel(target_compartment, speed=STEPPER_STEP_DELAY, direction=1):
-    """Spin the carousel to the target compartment (1-indexed)."""
-    global carousel_ready
+    """Spin the carousel to the target compartment (1-indexed) in a background thread."""
     if stepper_pins is None:
         app.logger.info('[carousel] rotation requested (stepper unavailable on this system)')
-        return False
+        return True  # don't block the request
 
-    # calculate the rotation time: each compartment ~9 seconds
-    # compartment 1 = 0 rotations (9s), com
-    # 2 = 9s, 3 = 18s, 4 = 27s
-    duration = (target_compartment - 1) * STEPS_PER_COMPARTMENT
-    if duration == 0:
-        # no rotation needed
-        return True
+    with stepper_lock:
+        if not carousel_ready:
+            app.logger.warning('[carousel] already rotating, ignoring request')
+            return False
+        carousel_ready = False
 
-    carousel_ready = False
-    app.logger.info('[carousel] rotating to compartment %s (%s seconds)', target_compartment, duration)
-    stepperMotor(duration, direction)
-    carousel_ready = True
-    app.logger.info('[carousel] rotation to compartment %s complete', target_compartment)
+    # run stepper in background thread — don't block Flask
+    def _run():
+        try:
+            duration = (target_compartment - 1) * STEPS_PER_COMPARTMENT
+            if duration == 0:
+                return
+            app.logger.info('[carousel] rotating to compartment %s (%ds)', target_compartment, duration)
+            stepperMotor(duration, direction)
+            app.logger.info('[carousel] rotation to compartment %s complete', target_compartment)
+        except Exception as e:
+            app.logger.error('[carousel] rotation failed: %s', e)
+        finally:
+            with stepper_lock:
+                carousel_ready = True
+
+    threading.Thread(target=_run, daemon=True).start()
     return True
 
 
@@ -145,21 +155,23 @@ def stepperMotor(duration_seconds, direction=1):
 
 
 def create_servo(name='compartment', gpio=SERVO_GPIO):
-    """Initialize servo — just open the lgpio handle. No GPIO operations yet."""
-    global lgpio_handle
+    """Initialize servo — lgpio chip opened LAZY on first door command (avoids gpiozero conflict)."""
+    global lgpio_handle, lgpio_initialized
     if not LGPIO_AVAILABLE or lgpio is None:
-        app.logger.warning('[servo:%s] lgpio not available on this system', name)
-        return False
+        app.logger.info('[servo:%s] lgpio not available on this system', name)
+        return True  # ok to continue without servo
+    if lgpio_initialized:
+        return True
     try:
         lgpio_handle = lgpio.gpiochip_open(0)
-        # Don't touch the GPIO yet — wait until a door command arrives
+        lgpio_initialized = True
         door_states[name] = False
-        app.logger.info('[servo:%s] lgpio chip opened (GPIO %s claimed on first use)', name, gpio)
+        app.logger.info('[servo:%s] lgpio chip opened (GPIO %s ready)', name, gpio)
         return True
     except Exception as e:
         app.logger.warning('[servo:%s] init failed: %s', name, str(e))
         lgpio_handle = None
-        return False
+        return True  # ok to continue without servo
 
 
 def _set_servo_angle(angle):
@@ -186,17 +198,20 @@ def _stop_servo_pwm():
         app.logger.error('[servo] _stop_servo_pwm failed: %s', str(e))
 
 
-# initialize the servo at startup
-_create_servo_result = create_servo('compartment', SERVO_GPIO)
-# Servo stays completely off (no PWM, zero power) until open_door() is called
+# stepper initializes immediately (gpiozero-safe)
 create_stepper()
+# servo lgpio chip opens lazily on first open_door() call
 
 
 def open_door(name='compartment', angle=None):
-    """Open the door servo with lgpio hardware_PWM (continuous 50Hz)."""
+    """Open the door servo with lgpio hardware_PWM (continuous 50Hz). Initializes lgpio lazily."""
+    # lazy-init lgpio on first use
+    if lgpio_handle is None:
+        create_servo(name)
     if lgpio_handle is None:
         app.logger.info('[door:%s] open requested (servo unavailable)', name)
-        return False
+        door_states[name] = True
+        return True  # don't block the workflow
     try:
         target = angle if angle is not None else SERVO_OPEN_ANGLE
         _set_servo_angle(target)
