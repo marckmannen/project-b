@@ -5,5 +5,6 @@ PyMySQL==1.1.1
 pyserial==3.5
 gpiozero
 pigpio
+lgpio
 smbus2
 websocket-client==1.9.0

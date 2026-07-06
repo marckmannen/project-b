@@ -16,19 +16,18 @@ except ImportError:
     list_ports = None
 
 try:
-    from gpiozero import AngularServo, OutputDevice
+    from gpiozero import OutputDevice
     try:
-        from gpiozero.pins.lgpio import LGPIOFactory
+        import lgpio
         LGPIO_AVAILABLE = True
     except ImportError:
         LGPIO_AVAILABLE = False
-        LGPIOFactory = None
+        lgpio = None
     GPIOZERO_AVAILABLE = True
 except ImportError:
     GPIOZERO_AVAILABLE = False
-    AngularServo = None
     OutputDevice = None
-    LGPIOFactory = None
+    lgpio = None
 
 load_dotenv()
 
@@ -42,10 +41,11 @@ PHARMACY_NAME = os.getenv('PHARMACY_NAME', 'Medicijnkluis')
 
 # servo door config
 SERVO_GPIO = int(os.getenv('SERVO_GPIO', '18'))
-SERVO_MIN_PWM = float(os.getenv('SERVO_MIN_PWM', '0.0006'))
-SERVO_MAX_PWM = float(os.getenv('SERVO_MAX_PWM', '0.0023'))
+SERVO_MIN_PW_US = int(os.getenv('SERVO_MIN_PW_US', '600'))     # 0.6ms = 600µs
+SERVO_MAX_PW_US = int(os.getenv('SERVO_MAX_PW_US', '2300'))    # 2.3ms = 2300µs
 SERVO_OPEN_ANGLE = float(os.getenv('SERVO_OPEN_ANGLE', '90'))
 SERVO_CLOSE_ANGLE = float(os.getenv('SERVO_CLOSE_ANGLE', '0'))
+SERVO_PWM_FREQ = 50  # standard servo PWM frequency
 
 # stepper motor config (carousel compartments)
 STEPPER_STEP_DELAY = float(os.getenv('STEPPER_STEP_DELAY', '0.001'))  # seconds per step
@@ -56,8 +56,8 @@ latest_qr_code = None
 serial_thread = None
 serial_stop_event = threading.Event()
 
-# servo door control (lgpio hardware PWM, Pi 5 compatible, zero jitter)
-servo_door = None  # AngularServo instance
+# servo door control (lgpio hardware PWM via tx_servo — zero jitter)
+lgpio_handle = None
 door_states = {}  # name -> bool (open/closed)
 
 # stepper motor control (carousel)
@@ -144,49 +144,46 @@ def stepperMotor(duration_seconds, direction=1):
             pin.off()
 
 
-def create_servo(name, gpio, min_pw=SERVO_MIN_PWM, max_pw=SERVO_MAX_PWM, open_angle=SERVO_OPEN_ANGLE, close_angle=SERVO_CLOSE_ANGLE):
-    """Initialize servo with lgpio hardware PWM (zero jitter, Pi 5 compatible)."""
-    global servo_door
-    if not GPIOZERO_AVAILABLE or AngularServo is None:
-        app.logger.warning('[servo:%s] gpiozero not available', name)
+def create_servo(name='compartment', gpio=SERVO_GPIO):
+    """Initialize servo with lgpio tx_servo hardware PWM (zero jitter, Pi 5 compatible)."""
+    global lgpio_handle
+    if not LGPIO_AVAILABLE or lgpio is None:
+        app.logger.warning('[servo:%s] lgpio not available on this system', name)
         return False
     try:
-        factory = LGPIOFactory() if LGPIO_AVAILABLE and LGPIOFactory else None
-        app.logger.info('[servo:%s] using %s pin factory', name, 'lgpio' if factory else 'auto-detect')
-        servo_door = AngularServo(
-            gpio,
-            min_angle=0,
-            max_angle=90,
-            min_pulse_width=min_pw,
-            max_pulse_width=max_pw,
-            pin_factory=factory
-        )
-        # start closed
-        servo_door.angle = close_angle
+        lgpio_handle = lgpio.gpiochip_open(0)
+        lgpio.gpio_claim_output(lgpio_handle, gpio)
+        _set_servo_angle(SERVO_CLOSE_ANGLE)
         door_states[name] = False
-        app.logger.info('[servo:%s] initialized on GPIO %s (jitter-free)', name, gpio)
+        app.logger.info('[servo:%s] initialized with lgpio tx_servo (hardware PWM, zero jitter) on GPIO %s', name, gpio)
         return True
     except Exception as e:
         app.logger.warning('[servo:%s] init failed: %s', name, str(e))
-        servo_door = None
+        lgpio_handle = None
         return False
+
+
+def _set_servo_angle(angle):
+    """Convert angle (0-90) to pulse width and apply via lgpio hardware PWM."""
+    if lgpio_handle is None:
+        return
+    pulse_us = int(SERVO_MIN_PW_US + (angle / 90.0) * (SERVO_MAX_PW_US - SERVO_MIN_PW_US))
+    lgpio.tx_servo(lgpio_handle, SERVO_GPIO, pulse_us, SERVO_PWM_FREQ)
 
 
 # initialize the servo at startup
 create_servo('compartment', SERVO_GPIO)
-
-# initialize the stepper motor at startup
 create_stepper()
 
 
 def open_door(name='compartment', angle=None):
-    """Open the door servo with lgpio."""
-    if servo_door is None:
+    """Open the door servo with lgpio tx_servo."""
+    if lgpio_handle is None:
         app.logger.info('[door:%s] open requested (servo unavailable)', name)
         return False
     try:
         target = angle if angle is not None else SERVO_OPEN_ANGLE
-        servo_door.angle = target
+        _set_servo_angle(target)
         door_states[name] = True
         app.logger.info('[door:%s] opened to %s°', name, target)
         return True
@@ -196,13 +193,13 @@ def open_door(name='compartment', angle=None):
 
 
 def close_door(name='compartment', angle=None):
-    """Close the door servo with lgpio."""
-    if servo_door is None:
+    """Close the door servo with lgpio tx_servo."""
+    if lgpio_handle is None:
         app.logger.info('[door:%s] close requested (servo unavailable)', name)
         return False
     try:
         target = angle if angle is not None else SERVO_CLOSE_ANGLE
-        servo_door.angle = target
+        _set_servo_angle(target)
         door_states[name] = False
         app.logger.info('[door:%s] closed to %s°', name, target)
         return True
