@@ -43,7 +43,7 @@ PHARMACY_NAME = os.getenv('PHARMACY_NAME', 'Medicijnkluis')
 SERVO_GPIO = int(os.getenv('SERVO_GPIO', '18'))
 SERVO_MIN_PW_US = int(os.getenv('SERVO_MIN_PW_US', '600'))     # 0.6ms = 600µs
 SERVO_MAX_PW_US = int(os.getenv('SERVO_MAX_PW_US', '2300'))    # 2.3ms = 2300µs
-SERVO_OPEN_ANGLE = float(os.getenv('SERVO_OPEN_ANGLE', '90'))
+SERVO_OPEN_ANGLE = float(os.getenv('SERVO_OPEN_ANGLE', '180'))  # fully open (180° servo)
 SERVO_CLOSE_ANGLE = float(os.getenv('SERVO_CLOSE_ANGLE', '0'))
 SERVO_PWM_FREQ = 50  # standard servo PWM frequency
 
@@ -121,6 +121,18 @@ def rotate_carousel(target_compartment, speed=STEPPER_STEP_DELAY, direction=1):
     return True
 
 
+def rotate_carousel_blocking(target_compartment, direction=1):
+    """Spin carousel and BLOCK until complete (call from a background thread)."""
+    if stepper_pins is None:
+        return
+    duration = (target_compartment - 1) * STEPS_PER_COMPARTMENT
+    if duration == 0:
+        return
+    app.logger.info('[carousel] rotating to compartment %s (%ds)', target_compartment, duration)
+    stepperMotor(duration, direction)
+    app.logger.info('[carousel] rotation to compartment %s complete', target_compartment)
+
+
 def stepperMotor(duration_seconds, direction=1):
     """Run the stepper motor for the given duration and direction."""
     if stepper_pins is None:
@@ -167,10 +179,10 @@ def _set_servo_angle(angle, gpio=SERVO_GPIO):
     try:
         handle = lgpio.gpiochip_open(0)
         lgpio.gpio_claim_output(handle, gpio)
-        pulse_us = int(SERVO_MIN_PW_US + (angle / 90.0) * (SERVO_MAX_PW_US - SERVO_MIN_PW_US))
+        pulse_us = int(SERVO_MIN_PW_US + (angle / 180.0) * (SERVO_MAX_PW_US - SERVO_MIN_PW_US))
         lgpio.tx_servo(handle, gpio, pulse_us, SERVO_PWM_FREQ)
-        time.sleep(0.6)  # hold chip open so servo can reach position
-        lgpio.tx_servo(handle, gpio, 0)  # cut signal cleanly before closing
+        time.sleep(0.6)
+        lgpio.tx_servo(handle, gpio, 0)
     except Exception as e:
         app.logger.error('[servo] _set_servo_angle failed: %s', e)
     finally:
@@ -646,14 +658,12 @@ def user_pickup(order_id):
         if compartment is None:
             return jsonify({'error': 'Vak nog niet toegewezen / Compartment not assigned yet'}), 400
 
-        # Spin the carousel to the correct compartment first
-        rotate_carousel(compartment)
+        # Run carousel + door open sequentially in background (carousel finishes first)
+        def _dispense():
+            rotate_carousel_blocking(compartment)
+            open_door()
 
-        # Then open the compartment door
-        open_door()
-
-        # DO NOT change status yet - wait until user finishes
-        # Status stays 'ready' during dispensing
+        threading.Thread(target=_dispense, daemon=True).start()
         return jsonify({'status': 'ok', 'compartment': compartment}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
