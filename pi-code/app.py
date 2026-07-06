@@ -16,11 +16,12 @@ except ImportError:
     list_ports = None
 
 try:
-    from gpiozero import AngularServo
+    from gpiozero import AngularServo, OutputDevice
     GPIOZERO_AVAILABLE = True
 except ImportError:
     GPIOZERO_AVAILABLE = False
     AngularServo = None
+    OutputDevice = None
 
 load_dotenv()
 
@@ -39,6 +40,9 @@ SERVO_MAX_PWM = float(os.getenv('SERVO_MAX_PWM', '0.0023'))
 SERVO_OPEN_ANGLE = float(os.getenv('SERVO_OPEN_ANGLE', '90'))
 SERVO_CLOSE_ANGLE = float(os.getenv('SERVO_CLOSE_ANGLE', '0'))
 
+# stepper motor config (carousel compartments)
+STEPPER_STEP_DELAY = float(os.getenv('STEPPER_STEP_DELAY', '0.001'))  # seconds per step
+
 serial_connection = None
 serial_lock = threading.Lock()
 latest_qr_code = None
@@ -48,6 +52,89 @@ serial_stop_event = threading.Event()
 # servo door control
 servos = {}  # name -> AngularServo instance
 door_states = {}  # name -> bool (open/closed)
+
+# stepper motor control (carousel)
+stepper_pins = None
+carousel_ready = True  # whether the carousel is accepting new rotation requests
+
+STEPS_PER_COMPARTMENT = 9  # ~9 seconds at default step rate
+
+def create_stepper():
+    """Initialize the stepper motor pins."""
+    global stepper_pins
+    if not GPIOZERO_AVAILABLE or OutputDevice is None:
+        app.logger.warning('[stepper] gpiozero not available on this system')
+        return False
+    try:
+        stepper_pins = [
+            OutputDevice(17),  # IN1
+            OutputDevice(12),  # IN2
+            OutputDevice(27),  # IN3
+            OutputDevice(22),  # IN4
+        ]
+        # turn all pins off
+        for pin in stepper_pins:
+            pin.off()
+        app.logger.info('[stepper] initialized on GPIOs 17, 12, 27, 22')
+        return True
+    except Exception as e:
+        app.logger.warning('[stepper] init failed: %s', e)
+        return False
+
+
+def rotate_carousel(target_compartment, speed=STEPPER_STEP_DELAY, direction=1):
+    """Spin the carousel to the target compartment (1-indexed)."""
+    global carousel_ready
+    if stepper_pins is None:
+        app.logger.info('[carousel] rotation requested (stepper unavailable on this system)')
+        return False
+
+    # calculate the rotation time: each compartment ~9 seconds
+    # compartment 1 = 0 rotations (9s), com
+    # 2 = 9s, 3 = 18s, 4 = 27s
+    duration = (target_compartment - 1) * STEPS_PER_COMPARTMENT
+    if duration == 0:
+        # no rotation needed
+        return True
+
+    carousel_ready = False
+    app.logger.info('[carousel] rotating to compartment %s (%s seconds)', target_compartment, duration)
+    stepperMotor(duration, direction)
+    carousel_ready = True
+    app.logger.info('[carousel] rotation to compartment %s complete', target_compartment)
+    return True
+
+
+def stepperMotor(duration_seconds, direction=1):
+    """Run the stepper motor for the given duration and direction."""
+    if stepper_pins is None:
+        return
+
+    sequence = [
+        [1, 0, 0, 0],
+        [1, 1, 0, 0],
+        [0, 1, 0, 0],
+        [0, 1, 1, 0],
+        [0, 0, 1, 0],
+        [0, 0, 1, 1],
+        [0, 0, 0, 1],
+        [1, 0, 0, 1]
+    ]
+
+    seq = sequence if direction == 1 else sequence[::-1]
+    end_time = time.time() + duration_seconds
+
+    try:
+        while time.time() < end_time:
+            for step in seq:
+                if time.time() >= end_time:
+                    break
+                for pin, state in zip(stepper_pins, step):
+                    pin.on() if state else pin.off()
+                time.sleep(STEPPER_STEP_DELAY)
+    finally:
+        for pin in stepper_pins:
+            pin.off()
 
 
 def create_servo(name, gpio, min_pw=SERVO_MIN_PWM, max_pw=SERVO_MAX_PWM, open_angle=SERVO_OPEN_ANGLE, close_angle=SERVO_CLOSE_ANGLE):
@@ -74,6 +161,9 @@ def create_servo(name, gpio, min_pw=SERVO_MIN_PWM, max_pw=SERVO_MAX_PWM, open_an
 
 # initialize the servo at startup
 create_servo('compartment', SERVO_GPIO)
+
+# initialize the stepper motor at startup
+create_stepper()
 
 
 def open_door(name='compartment', angle=None):
@@ -533,7 +623,10 @@ def user_pickup(order_id):
         if compartment is None:
             return jsonify({'error': 'Vak nog niet toegewezen / Compartment not assigned yet'}), 400
 
-        # Open the compartment door via servo
+        # Spin the carousel to the correct compartment first
+        rotate_carousel(compartment)
+
+        # Then open the compartment door
         open_door()
 
         # DO NOT change status yet - wait until user finishes
