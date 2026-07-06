@@ -145,17 +145,19 @@ def stepperMotor(duration_seconds, direction=1):
 
 
 def create_servo(name='compartment', gpio=SERVO_GPIO):
-    """Initialize servo with lgpio tx_servo hardware PWM (zero jitter, Pi 5 compatible)."""
+    """Initialize servo with lgpio hardware_PWM (continuous 50Hz, zero jitter, Pi 5 compatible)."""
     global lgpio_handle
     if not LGPIO_AVAILABLE or lgpio is None:
         app.logger.warning('[servo:%s] lgpio not available on this system', name)
         return False
     try:
         lgpio_handle = lgpio.gpiochip_open(0)
-        lgpio.gpio_claim_output(lgpio_handle, gpio)
-        _set_servo_angle(SERVO_CLOSE_ANGLE)
+        # Don't claim_output — hardware_PWM will configure the GPIO itself
+        pulse_us = int(SERVO_MIN_PW_US + (SERVO_CLOSE_ANGLE / 90.0) * (SERVO_MAX_PW_US - SERVO_MIN_PW_US))
+        duty_pct = (pulse_us / 20000.0) * 100.0
+        lgpio.hardware_PWM(lgpio_handle, gpio, SERVO_PWM_FREQ, duty_pct)
         door_states[name] = False
-        app.logger.info('[servo:%s] initialized with lgpio tx_servo (hardware PWM, zero jitter) on GPIO %s', name, gpio)
+        app.logger.info('[servo:%s] initialized with lgpio hardware_PWM (zero jitter) on GPIO %s', name, gpio)
         return True
     except Exception as e:
         app.logger.warning('[servo:%s] init failed: %s', name, str(e))
@@ -164,11 +166,20 @@ def create_servo(name='compartment', gpio=SERVO_GPIO):
 
 
 def _set_servo_angle(angle):
-    """Convert angle (0-90) to pulse width and apply via lgpio hardware PWM."""
+    """Convert angle (0-90) to pulse width and apply via lgpio HARDWARE PWM (continuous 50Hz)."""
     if lgpio_handle is None:
         return
     pulse_us = int(SERVO_MIN_PW_US + (angle / 90.0) * (SERVO_MAX_PW_US - SERVO_MIN_PW_US))
-    lgpio.tx_servo(lgpio_handle, SERVO_GPIO, pulse_us, SERVO_PWM_FREQ)
+    # duty cycle as %: pulse width / period * 100 (period at 50Hz = 20ms = 20000µs)
+    duty_pct = (pulse_us / 20000.0) * 100.0
+    lgpio.hardware_PWM(lgpio_handle, SERVO_GPIO, SERVO_PWM_FREQ, duty_pct)
+
+
+def _stop_servo_pwm():
+    """Stop all PWM output on the servo GPIO."""
+    if lgpio_handle is None:
+        return
+    lgpio.hardware_PWM(lgpio_handle, SERVO_GPIO, 0, 0)
 
 
 # initialize the servo at startup
@@ -177,7 +188,7 @@ create_stepper()
 
 
 def open_door(name='compartment', angle=None):
-    """Open the door servo with lgpio tx_servo."""
+    """Open the door servo with lgpio hardware_PWM (continuous 50Hz)."""
     if lgpio_handle is None:
         app.logger.info('[door:%s] open requested (servo unavailable)', name)
         return False
@@ -200,6 +211,8 @@ def close_door(name='compartment', angle=None):
     try:
         target = angle if angle is not None else SERVO_CLOSE_ANGLE
         _set_servo_angle(target)
+        time.sleep(0.5)  # let servo reach position before cutting PWM
+        _stop_servo_pwm()  # cut PWM — no jitter while holding closed
         door_states[name] = False
         app.logger.info('[door:%s] closed to %s°', name, target)
         return True
