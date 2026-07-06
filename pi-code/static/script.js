@@ -585,18 +585,23 @@ function renderUserOrders(orders) {
 
 // pick up order
 async function pickUpOrder(orderId) {
+  // Go to dispensing page IMMEDIATELY (don't wait for backend)
+  goTo('page-dispensing');
+  
   try {
     const res = await fetch('/api/user/pickup/' + orderId, { method: 'POST' });
     const data = await res.json();
     if (res.ok) {
       currentPickupOrderId = orderId;
-      console.log('[pickup] order', orderId, 'accepted — going to dispensing');
-      goTo('page-dispensing');
+      console.log('[pickup] order', orderId, 'accepted — carousel spinning, door will open');
     } else {
+      // Backend rejected (e.g. compartment not assigned) — go back to orders
       showError(data.error || 'Kon order niet ophalen');
+      goTo('page-orders');
     }
   } catch (e) {
     showError('Verbindingsfout, probeer opnieuw.');
+    goTo('page-orders');
   }
 }
 
