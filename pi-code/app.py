@@ -733,7 +733,7 @@ def print_receipt():
             lines.append(f'Vak: {compartment}')
         lines.extend(['', '---- Eind bonnetje ----', '', '', '', ''])
 
-        receipt_text = '\n'.join(lines)
+        receipt_text = '\r\n'.join(lines)
 
         # send to printer
         if serial is None:
@@ -752,15 +752,10 @@ def print_receipt():
             with serial_lock:
                 time.sleep(1.5)  # let the Arduino/translator settle before sending ESC/POS data
                 conn.write(b'\x1b\x40')  # ESC @ — init printer
-                conn.write(f'---{pharmacy_name}---\r\n'.encode('ascii', 'replace'))
-                conn.write(b'Medicijnen:\r\n')
-                conn.write(f'    - {product_name} {amount}x\r\n'.encode('ascii', 'replace'))
-                conn.write(b'\r\n')
-                conn.write(f'Order: {external_order_id}\r\n'.encode('ascii', 'replace'))
-                conn.write(f'Naam: {customer_name}\r\n'.encode('ascii', 'replace'))
-                conn.write(f'Datum: {today}\r\n'.encode('ascii', 'replace'))
-                conn.write(b'\r\n\r\n')
-                conn.write(b'\x1b\x64\x03')  # ESC d 3 — feed 3 lines for a cleaner tear-off
+
+                # send the full receipt as one write to avoid buffer issues
+                full_receipt = (receipt_text + '\r\n').encode('ascii', 'replace') + b'\x1b\x64\x04'
+                conn.write(full_receipt)
                 conn.flush()
         except (serial.SerialException, OSError) as exc:
             error_msg = str(exc)
