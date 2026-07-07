@@ -16,11 +16,10 @@ except ImportError:
     list_ports = None
 
 try:
-    from gpiozero import AngularServo, OutputDevice
+    from gpiozero import OutputDevice
     GPIOZERO_AVAILABLE = True
 except ImportError:
     GPIOZERO_AVAILABLE = False
-    AngularServo = None
     OutputDevice = None
 
 load_dotenv()
@@ -33,13 +32,6 @@ PRINTER_PORT = os.getenv('PRINTER_PORT', '/dev/ttyACM0')
 PRINTER_BAUD = int(os.getenv('PRINTER_BAUD', '9600'))
 PHARMACY_NAME = os.getenv('PHARMACY_NAME', 'Medicijnkluis')
 
-# servo door config
-SERVO_GPIO = int(os.getenv('SERVO_GPIO', '18'))
-SERVO_MIN_PWM = float(os.getenv('SERVO_MIN_PWM', '0.0006'))
-SERVO_MAX_PWM = float(os.getenv('SERVO_MAX_PWM', '0.0023'))
-SERVO_OPEN_ANGLE = float(os.getenv('SERVO_OPEN_ANGLE', '170'))
-SERVO_CLOSE_ANGLE = float(os.getenv('SERVO_CLOSE_ANGLE', '90'))
-
 # stepper motor config (carousel compartments)
 STEPPER_STEP_DELAY = float(os.getenv('STEPPER_STEP_DELAY', '0.001'))  # seconds per step
 
@@ -49,8 +41,6 @@ latest_qr_code = None
 serial_thread = None
 serial_stop_event = threading.Event()
 
-# servo door control
-servos = {}  # name -> AngularServo instance
 door_states = {}  # name -> bool (open/closed)
 
 # stepper motor control (carousel)
@@ -188,47 +178,22 @@ def stepperMotor(duration_seconds, direction=1):
         stepper_rotation_done.set()
 
 
-def create_servo(name, gpio, min_pw=SERVO_MIN_PWM, max_pw=SERVO_MAX_PWM, open_angle=SERVO_OPEN_ANGLE, close_angle=SERVO_CLOSE_ANGLE):
-    """Initialize a named servo door instance. Call once per servo at startup."""
-    global servos, door_states
-    if not GPIOZERO_AVAILABLE or AngularServo is None:
-        app.logger.warning('[servo:%s] gpiozero not available on this system', name)
-        return False
-    try:
-        sns = AngularServo(
-            gpio,
-            min_pulse_width=min_pw,
-            max_pulse_width=max_pw
-        )
-        sns.angle = close_angle
-        servos[name] = sns
-        door_states[name] = False
-        app.logger.info('[servo:%s] initialized on GPIO %s', name, gpio)
-        return True
-    except Exception as e:
-        app.logger.warning('[servo:%s] init failed: %s', name, e)
-        return False
-
-
-# initialize the servo at startup
-create_servo('compartment', SERVO_GPIO)
-
 # initialize the stepper motor at startup
 create_stepper()
 
 
 def open_door(name='compartment', angle=None):
-    """Open a named door (default: compartment). Pass angle to override global default."""
-    sns = servos.get(name)
-    if sns is None:
-        app.logger.info('[door:%s] open requested (servo unavailable)', name)
-        return False
+    """Send DOOR:OPEN command to Arduino over serial."""
     try:
-        target = angle if angle is not None else SERVO_OPEN_ANGLE
-        sns.angle = target
-        time.sleep(0.5)  # let the servo reach position
+        conn = ensure_serial_connection()
+        if conn is None:
+            app.logger.warning('[door:%s] serial not available', name)
+            return False
+        with serial_lock:
+            conn.write(b'DOOR:OPEN\n')
+            conn.flush()
         door_states[name] = True
-        app.logger.info('[door:%s] opened to %s degrees', name, target)
+        app.logger.info('[door:%s] opened via Arduino', name)
         return True
     except Exception as e:
         app.logger.error('[door:%s] open failed: %s', name, e)
@@ -236,17 +201,17 @@ def open_door(name='compartment', angle=None):
 
 
 def close_door(name='compartment', angle=None):
-    """Close a named door (default: compartment). Pass angle to override global default."""
-    sns = servos.get(name)
-    if sns is None:
-        app.logger.info('[door:%s] close requested (servo unavailable)', name)
-        return False
+    """Send DOOR:CLOSE command to Arduino over serial."""
     try:
-        target = angle if angle is not None else SERVO_CLOSE_ANGLE
-        sns.angle = target
-        time.sleep(0.5)  # let the servo reach position
+        conn = ensure_serial_connection()
+        if conn is None:
+            app.logger.warning('[door:%s] serial not available', name)
+            return False
+        with serial_lock:
+            conn.write(b'DOOR:CLOSE\n')
+            conn.flush()
         door_states[name] = False
-        app.logger.info('[door:%s] closed to %s degrees', name, target)
+        app.logger.info('[door:%s] closed via Arduino', name)
         return True
     except Exception as e:
         app.logger.error('[door:%s] close failed: %s', name, e)
@@ -733,9 +698,9 @@ def print_receipt():
             lines.append(f'Vak: {compartment}')
         lines.extend(['', '---- Eind bonnetje ----', '', '', '', ''])
 
-        receipt_text = '\r\n'.join(lines)
+        receipt_text = '\n'.join(lines)
 
-        # send to printer
+        # send to printer via Arduino
         if serial is None:
             return jsonify({'error': 'Printer support is unavailable. Install pyserial first.'}), 500
 
@@ -750,12 +715,11 @@ def print_receipt():
 
         try:
             with serial_lock:
-                time.sleep(1.5)  # let the Arduino/translator settle before sending ESC/POS data
-                conn.write(b'\x1b\x40')  # ESC @ — init printer
-
-                # send the full receipt as one write to avoid buffer issues
-                full_receipt = (receipt_text + '\r\n').encode('ascii', 'replace') + b'\x1b\x64\x04'
-                conn.write(full_receipt)
+                time.sleep(1.5)  # let the Arduino settle before sending
+                # send ESC/POS init + full receipt to Arduino (which forwards to printer)
+                # each line terminated with \n — Arduino forwards non-DOOR lines to printer
+                payload = b'\x1b\x40\n' + (receipt_text + '\n').encode('ascii', 'replace') + b'\x1b\x64\x03\n'
+                conn.write(payload)
                 conn.flush()
         except (serial.SerialException, OSError) as exc:
             error_msg = str(exc)
