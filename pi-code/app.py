@@ -687,6 +687,10 @@ def user_pickup(order_id):
             return jsonify({'error': 'Vak nog niet toegewezen / Compartment not assigned yet'}), 400
 
         # Spin the carousel to the correct compartment first
+        steps, direction = _shortest_path(current_compartment, compartment, TOTAL_COMPARTMENTS)
+        rotation_seconds = steps * STEPS_PER_COMPARTMENT
+        door_open_seconds = 3  # time for door to open after rotation
+        wait_seconds = max(1, int(rotation_seconds + door_open_seconds))  # at least 1 second
         rotate_carousel(compartment)
 
         # Then open the compartment door
@@ -694,7 +698,7 @@ def user_pickup(order_id):
 
         # DO NOT change status yet - wait until user finishes
         # Status stays 'ready' during dispensing
-        return jsonify({'status': 'ok', 'compartment': compartment}), 200
+        return jsonify({'status': 'ok', 'compartment': compartment, 'wait_seconds': wait_seconds}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:

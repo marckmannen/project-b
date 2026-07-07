@@ -9,10 +9,11 @@ let currentPickupOrderId = null; // track which order was picked up for printing
 let qrPollInterval = null;
 
 // dispensing timer
-const DISPENSING_DURATION = 10; // seconds
-let dispensingTimeLeft = DISPENSING_DURATION;
+const DISPENSING_DURATION_DEFAULT = 10; // fallback seconds
+let dispensingTimeLeft = DISPENSING_DURATION_DEFAULT;
 let dispensingInterval = null;
 const TIMER_CIRCUMFERENCE = 2 * Math.PI * 54; // ~339.292
+let dispensingTotal = DISPENSING_DURATION_DEFAULT; // current total for progress ring
 
 // inactivity timeout
 const INACTIVITY_LIMIT = 60 * 1000; // 30 seconds
@@ -355,8 +356,9 @@ function dateReset() {
 }
 
 // dispensing timer
-function startDispensingTimer() {
-  dispensingTimeLeft = DISPENSING_DURATION;
+function startDispensingTimer(totalSeconds) {
+  dispensingTotal = totalSeconds || DISPENSING_DURATION_DEFAULT;
+  dispensingTimeLeft = dispensingTotal;
   updateTimerDisplay();
 
   dispensingInterval = setInterval(() => {
@@ -380,7 +382,7 @@ function updateTimerDisplay() {
   }
 
   if (timerProgress) {
-    const progress = 1 - (dispensingTimeLeft / DISPENSING_DURATION);
+    const progress = 1 - (dispensingTimeLeft / dispensingTotal);
     const offset = TIMER_CIRCUMFERENCE * (1 - progress);
     timerProgress.style.strokeDasharray = TIMER_CIRCUMFERENCE;
     timerProgress.style.strokeDashoffset = offset;
@@ -653,14 +655,18 @@ function renderUserOrders(orders) {
 
 // pick up order
 async function pickUpOrder(orderId) {
-  // Go to dispensing page IMMEDIATELY (don't wait for backend)
+  // Go to dispensing page IMMEDIATELY with default timer, then update when backend responds
   goTo('page-dispensing');
-  
+
   try {
     const res = await fetch('/api/user/pickup/' + orderId, { method: 'POST' });
     const data = await res.json();
     if (res.ok) {
       currentPickupOrderId = orderId;
+      // restart timer with actual wait time from backend
+      if (data.wait_seconds) {
+        startDispensingTimer(data.wait_seconds);
+      }
       console.log('[pickup] order', orderId, 'accepted — carousel spinning, door will open');
     } else {
       // Backend rejected (e.g. compartment not assigned) — go back to orders
