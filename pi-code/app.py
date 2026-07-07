@@ -56,6 +56,12 @@ door_states = {}  # name -> bool (open/closed)
 # stepper motor control (carousel)
 stepper_pins = None
 carousel_ready = True  # whether the carousel is accepting new rotation requests
+stepper_thread = None  # background thread for stepper rotation
+stepper_stop_event = threading.Event()  # signal to stop rotation early
+stepper_rotating = threading.Event()  # set while rotation is in progress
+stepper_rotation_start_time = None  # when rotation started
+stepper_target_duration = None  # planned duration in seconds
+stepper_rotation_done = threading.Event()  # set when rotation finishes (normally or interrupted)
 
 STEPS_PER_COMPARTMENT = 9.1  # ~9 seconds at default step rate
 
@@ -82,12 +88,19 @@ def create_stepper():
         return False
 
 
-def rotate_carousel(target_compartment, speed=STEPPER_STEP_DELAY, direction=1):
+def rotate_carousel(target_compartment, speed=STEPPER_STEP_DELAY, direction=1, wait=True):
     """Spin the carousel to the target compartment (1-indexed)."""
-    global carousel_ready
+    global carousel_ready, stepper_rotation_start_time, stepper_target_duration
     if stepper_pins is None:
         app.logger.info('[carousel] rotation requested (stepper unavailable on this system)')
         return False
+
+    # stop any ongoing rotation first
+    if stepper_rotating.is_set():
+        stop_carousel()
+        # wait for the old rotation thread to finish
+        stepper_rotation_done.wait(timeout=3)
+        stepper_rotation_done.clear()
 
     # calculate the rotation time: each compartment ~9 seconds
     # compartment 1 = 0 rotations (9s), com
@@ -98,16 +111,43 @@ def rotate_carousel(target_compartment, speed=STEPPER_STEP_DELAY, direction=1):
         return True
 
     carousel_ready = False
+    stepper_stop_event.clear()
+    stepper_rotating.set()
+    stepper_rotation_done.clear()
+    stepper_rotation_start_time = time.time()
+    stepper_target_duration = duration
+
     app.logger.info('[carousel] rotating to compartment %s (%s seconds)', target_compartment, duration)
-    stepperMotor(duration, direction)
-    carousel_ready = True
+
+    # run stepper in background thread so it can be interrupted
+    stepper_thread = threading.Thread(
+        target=stepperMotor, args=(duration, direction), daemon=True
+    )
+    stepper_thread.start()
+
+    # optionally wait for rotation to complete (used by pickup endpoint)
+    if wait:
+        stepper_rotation_done.wait()
+
     app.logger.info('[carousel] rotation to compartment %s complete', target_compartment)
+    return True
+
+
+def stop_carousel():
+    """Stop the currently running carousel rotation."""
+    if not stepper_rotating.is_set():
+        return False
+    app.logger.info('[carousel] stopping rotation early')
+    stepper_stop_event.set()
     return True
 
 
 def stepperMotor(duration_seconds, direction=1):
     """Run the stepper motor for the given duration and direction."""
+    global carousel_ready
     if stepper_pins is None:
+        stepper_rotating.clear()
+        stepper_rotation_done.set()
         return
 
     sequence = [
@@ -126,8 +166,16 @@ def stepperMotor(duration_seconds, direction=1):
 
     try:
         while time.time() < end_time:
+            # check stop signal
+            if stepper_stop_event.is_set():
+                app.logger.info('[stepper] stop signal received')
+                break
             for step in seq:
                 if time.time() >= end_time:
+                    break
+                # check stop signal between steps too
+                if stepper_stop_event.is_set():
+                    app.logger.info('[stepper] stop signal received')
                     break
                 for pin, state in zip(stepper_pins, step):
                     pin.on() if state else pin.off()
@@ -135,6 +183,9 @@ def stepperMotor(duration_seconds, direction=1):
     finally:
         for pin in stepper_pins:
             pin.off()
+        stepper_rotating.clear()
+        carousel_ready = True
+        stepper_rotation_done.set()
 
 
 def create_servo(name, gpio, min_pw=SERVO_MIN_PWM, max_pw=SERVO_MAX_PWM, open_angle=SERVO_OPEN_ANGLE, close_angle=SERVO_CLOSE_ANGLE):
@@ -779,7 +830,11 @@ def user_failed_pickup(order_id):
 
 @app.route('/api/door/close', methods=['POST'])
 def api_close_door():
-    """Close the compartment door (servo to closed position)."""
+    """Stop carousel (if rotating) and close the compartment door."""
+    stopped = stop_carousel()
+    if stopped:
+        # wait briefly for stepper thread to shut down
+        stepper_rotation_done.wait(timeout=2)
     try:
         close_door()
         return jsonify({'status': 'ok'}), 200
@@ -789,4 +844,4 @@ def api_close_door():
 
 if __name__ == '__main__':
     start_serial_thread()
-    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False, threaded=True)

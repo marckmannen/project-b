@@ -193,12 +193,24 @@ function goBack() {
   if (navHistory.length > 1) {
     navHistory.pop(); // remove current page
     const prev = navHistory[navHistory.length - 1];
-    // navigate without re-pushing to history
-    navigateTo(prev, false);
+    // close door / stop carousel before going back
+    closeDoorThenGoBack(prev);
   } else {
     // already at welcome
     goTo('page-welcome');
   }
+}
+
+async function closeDoorThenGoBack(targetPage) {
+  // close door and stop carousel (if rotating)
+  try {
+    await fetch('/api/door/close', { method: 'POST' });
+  } catch (e) {
+    console.error('[back] error closing door:', e);
+  }
+
+  // navigate without re-pushing to history
+  navigateTo(targetPage, false);
 }
 
 function navigateTo(id, pushHistory) {
