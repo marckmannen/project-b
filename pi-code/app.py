@@ -57,7 +57,7 @@ door_states = {}  # name -> bool (open/closed)
 stepper_pins = None
 carousel_ready = True  # whether the carousel is accepting new rotation requests
 
-STEPS_PER_COMPARTMENT = 9  # ~9 seconds at default step rate
+STEPS_PER_COMPARTMENT = 9.1  # ~9 seconds at default step rate
 
 def create_stepper():
     """Initialize the stepper motor pins."""
