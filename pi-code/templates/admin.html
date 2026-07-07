@@ -204,6 +204,9 @@
         html += '</select>';
         html += '<button class="btn btn-sm" onclick="assignOrderToCompartment(' + compartment.number + ')">Assign</button>';
         html += '</div>';
+        html += '<div class="compartment-rotate">';
+        html += '<button class="btn btn-sm btn-warning" onclick="rotateToCompartment(' + compartment.number + ')">▶ Rotate here</button>';
+        html += '</div>';
         html += '</div>';
       });
 
@@ -251,6 +254,19 @@
       try {
         await apiFetch('/api/admin/door/' + action, { method: 'POST' });
         statusEl.textContent = action === 'open' ? 'Door opened ✓' : 'Door closed ✓';
+        setTimeout(() => { statusEl.textContent = ''; }, 2000);
+      } catch (err) {
+        statusEl.textContent = 'Error: ' + err.message;
+        setTimeout(() => { statusEl.textContent = ''; }, 3000);
+      }
+    }
+
+    async function rotateToCompartment(compartment) {
+      const statusEl = document.getElementById('door-status');
+      statusEl.textContent = 'Rotating to compartment ' + compartment + '...';
+      try {
+        await apiFetch('/api/admin/carousel/rotate/' + compartment, { method: 'POST' });
+        statusEl.textContent = 'Carousel sent ✓';
         setTimeout(() => { statusEl.textContent = ''; }, 2000);
       } catch (err) {
         statusEl.textContent = 'Error: ' + err.message;

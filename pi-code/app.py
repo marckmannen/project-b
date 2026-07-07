@@ -818,6 +818,19 @@ def api_admin_door_close():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/carousel/rotate/<int:compartment>', methods=['POST'])
+def api_admin_rotate_carousel(compartment):
+    """Rotate the carousel to a specific compartment (admin)."""
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        # wait=False so the request returns immediately while rotation runs in background
+        rotate_carousel(compartment, wait=False)
+        return jsonify({'status': 'ok', 'compartment': compartment}), 202
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     start_serial_thread()
     app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False, threaded=True)
