@@ -14,15 +14,8 @@
       <h1>Admin Login</h1>
       <form id="login-form">
         <div class="form-group">
-          <label for="username">Username</label>
-          <input type="text" id="username" name="username" autocomplete="username" placeholder="Enter username or PIN code">
-        </div>
-        <div class="form-group">
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" autocomplete="current-password" placeholder="(optional when using PIN code)">
-        </div>
-        <div class="login-hint">
-          <small>Enter 6-digit PIN code as username, or use username + password</small>
+          <label for="pincode">Admin PIN code</label>
+          <input type="password" id="pincode" name="pincode" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit PIN" autofocus>
         </div>
         <div id="error-message" class="error-message"></div>
         <button type="submit" id="login-btn">Login</button>
@@ -36,25 +29,24 @@
   <script>
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
+
+      const pincode = document.getElementById('pincode').value;
       const errorMsg = document.getElementById('error-message');
       const loginBtn = document.getElementById('login-btn');
-      
+
       loginBtn.disabled = true;
       loginBtn.textContent = 'Logging in...';
       errorMsg.textContent = '';
-      
+
       try {
         const response = await fetch('/admin/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify({ pincode })
         });
-        
+
         const data = await response.json();
-        
+
         if (response.ok) {
           window.location.href = '/admin';
         } else {

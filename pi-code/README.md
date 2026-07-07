@@ -20,14 +20,13 @@ pip install -r requirements.txt
 maak een `.env` bestand in de hoofdmap van het project en vul daar de juiste gegevens in, bijvoorbeeld:
 
 ```env
-secretkey=geheime-sleutel
-db_host=localhost
-db_user=root
-db_password=wachtwoord
-db_name=database-naam
-db_port=3306
-admin_username=admin
-admin_password=admin-wachtwoord
+SECRET_KEY=geheime-sleutel
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=wachtwoord
+DB_NAME=database-naam
+DB_PORT=3306
+ADMIN_PINCODE=123456
 ```
 
 ## voorwaarde

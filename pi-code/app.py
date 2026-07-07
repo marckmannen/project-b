@@ -391,15 +391,10 @@ def admin_login():
         if not data:
             return jsonify({'error': 'Invalid request'}), 400
 
-        username = data.get('username', '')
-        password = data.get('password', '')
-
-        env_user = os.getenv('ADMIN_USERNAME', '')
-        env_pass = os.getenv('ADMIN_PASSWORD', '')
+        pincode = data.get('pincode', '')
         env_pin = os.getenv('ADMIN_PINCODE', '')
 
-        # allow login via username/password OR pincode (6-digit ADMIN_PINCODE)
-        if (username == env_user and password == env_pass) or (username == env_pin and username.isdigit() and len(username) == 6):
+        if pincode == env_pin:
             session['admin_authenticated'] = True
             return jsonify({'status': 'ok'})
         else:
