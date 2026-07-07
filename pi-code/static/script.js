@@ -154,12 +154,64 @@ function toggleLang() {
 
 // navigation
 let autoAdvanceTimer = null;
+let navHistory = ['page-welcome']; // track navigation history for back button
 
 function goTo(id) {
   if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
   if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
 
   hideTimeoutModal();
+  stopQrPolling();
+
+  // push to history (avoid duplicates for same page)
+  if (navHistory[navHistory.length - 1] !== id) {
+    navHistory.push(id);
+  }
+
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+
+  // show/hide back button based on whether we're on welcome page
+  const backBtns = document.querySelectorAll('.back-btn');
+  backBtns.forEach(btn => {
+    btn.style.visibility = id === 'page-welcome' ? 'hidden' : 'visible';
+  });
+
+  if (id === 'page-dispensing') {
+    startDispensingTimer();
+  }
+
+  if (id === 'page-qr') {
+    startQrPolling();
+  }
+
+  resetInactivityTimer();
+}
+
+function goBack() {
+  // go back one step in navigation history
+  if (navHistory.length > 1) {
+    navHistory.pop(); // remove current page
+    const prev = navHistory[navHistory.length - 1];
+    // navigate without re-pushing to history
+    navigateTo(prev, false);
+  } else {
+    // already at welcome
+    goTo('page-welcome');
+  }
+}
+
+function navigateTo(id, pushHistory) {
+  if (typeof pushHistory === 'undefined') pushHistory = true;
+  if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+  if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
+
+  hideTimeoutModal();
+  stopQrPolling();
+
+  if (pushHistory && navHistory[navHistory.length - 1] !== id) {
+    navHistory.push(id);
+  }
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -170,8 +222,6 @@ function goTo(id) {
 
   if (id === 'page-qr') {
     startQrPolling();
-  } else {
-    stopQrPolling();
   }
 
   resetInactivityTimer();
@@ -325,8 +375,8 @@ function updateTimerDisplay() {
   }
 }
 
-// stop process (normal manual stop — no status change)
-function stopProcess() {
+// stop process (normal manual stop — close servo door, mark order failed, reload to welcome)
+async function stopProcess() {
   resetInactivityTimer();
 
   // clear all timers
@@ -338,8 +388,24 @@ function stopProcess() {
   pinReset();
   dateReset();
 
-  // go to welcome page
-  goTo('page-welcome');
+  // close the servo door
+  try {
+    await fetch('/api/door/close', { method: 'POST' });
+  } catch (e) {
+    console.error('[stop] error closing door:', e);
+  }
+
+  // mark order as failed if in pickup
+  if (currentPickupOrderId) {
+    try {
+      await fetch('/api/user/failed_pickup/' + currentPickupOrderId, { method: 'POST' });
+    } catch (e) {
+      console.error('[stop] error marking order failed:', e);
+    }
+  }
+
+  // reload page to return to welcome
+  window.location.reload();
 }
 
 // stop process due to inactivity timeout — marks order as failed and hard-reloads

@@ -777,6 +777,16 @@ def user_failed_pickup(order_id):
         cur.close()
 
 
+@app.route('/api/door/close', methods=['POST'])
+def api_close_door():
+    """Close the compartment door (servo to closed position)."""
+    try:
+        close_door()
+        return jsonify({'status': 'ok'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     start_serial_thread()
     app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
