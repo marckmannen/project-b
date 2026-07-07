@@ -396,8 +396,10 @@ def admin_login():
 
         env_user = os.getenv('ADMIN_USERNAME', '')
         env_pass = os.getenv('ADMIN_PASSWORD', '')
+        env_pin = os.getenv('ADMIN_PINCODE', '')
 
-        if username == env_user and password == env_pass:
+        # allow login via username/password OR pincode (6-digit ADMIN_PINCODE)
+        if (username == env_user and password == env_pass) or (username == env_pin and username.isdigit() and len(username) == 6):
             session['admin_authenticated'] = True
             return jsonify({'status': 'ok'})
         else:
@@ -790,6 +792,30 @@ def user_failed_pickup(order_id):
 @app.route('/api/door/close', methods=['POST'])
 def api_close_door():
     """Close the compartment door (leave carousel to finish on its own)."""
+    try:
+        close_door()
+        return jsonify({'status': 'ok'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/door/open', methods=['POST'])
+def api_admin_door_open():
+    """Open the compartment door (admin)."""
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        open_door()
+        return jsonify({'status': 'ok'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/door/close', methods=['POST'])
+def api_admin_door_close():
+    """Close the compartment door (admin)."""
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
     try:
         close_door()
         return jsonify({'status': 'ok'}), 200

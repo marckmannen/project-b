@@ -45,7 +45,13 @@
           <h2>Compartment overview</h2>
           <span id="compartment-count" class="row-count">Loading compartments...</span>
         </div>
+        <div class="door-controls">
+          <button id="door-open-btn" class="btn btn-warning" onclick="toggleDoor('open')">Open door</button>
+          <button id="door-close-btn" class="btn btn-danger" onclick="toggleDoor('close')">Close door</button>
+          <span id="door-status" class="door-status"></span>
+        </div>
         <div id="compartments-container" class="compartment-grid">
+
           <div class="loading">Loading compartments...</div>
         </div>
       </section>
@@ -236,6 +242,19 @@
         await loadCompartments();
       } catch (err) {
         alert(err.message);
+      }
+    }
+
+    async function toggleDoor(action) {
+      const statusEl = document.getElementById('door-status');
+      statusEl.textContent = action === 'open' ? 'Opening...' : 'Closing...';
+      try {
+        await apiFetch('/api/admin/door/' + action, { method: 'POST' });
+        statusEl.textContent = action === 'open' ? 'Door opened ✓' : 'Door closed ✓';
+        setTimeout(() => { statusEl.textContent = ''; }, 2000);
+      } catch (err) {
+        statusEl.textContent = 'Error: ' + err.message;
+        setTimeout(() => { statusEl.textContent = ''; }, 3000);
       }
     }
 

@@ -200,6 +200,43 @@ body {
   align-items: center;
 }
 
+/* door controls */
+.door-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.door-status {
+  font-size: 13px;
+  color: var(--lavender-light);
+  transition: color 0.2s;
+}
+
+.btn-warning {
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.btn-warning:hover {
+  background: rgba(255, 193, 7, 0.35);
+}
+
+.btn-danger {
+  background: var(--red-bg);
+  color: var(--red);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.btn-danger:hover {
+  background: rgba(231, 76, 60, 0.3);
+}
+}
+
 .compartment-assign select {
   flex: 1;
   background: var(--card-bg);

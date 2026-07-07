@@ -15,11 +15,14 @@
       <form id="login-form">
         <div class="form-group">
           <label for="username">Username</label>
-          <input type="text" id="username" name="username" required autocomplete="username">
+          <input type="text" id="username" name="username" autocomplete="username" placeholder="Enter username or PIN code">
         </div>
         <div class="form-group">
           <label for="password">Password</label>
-          <input type="password" id="password" name="password" required autocomplete="current-password">
+          <input type="password" id="password" name="password" autocomplete="current-password" placeholder="(optional when using PIN code)">
+        </div>
+        <div class="login-hint">
+          <small>Enter 6-digit PIN code as username, or use username + password</small>
         </div>
         <div id="error-message" class="error-message"></div>
         <button type="submit" id="login-btn">Login</button>
