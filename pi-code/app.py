@@ -37,7 +37,7 @@ PHARMACY_NAME = os.getenv('PHARMACY_NAME', 'Medicijnkluis')
 SERVO_GPIO = int(os.getenv('SERVO_GPIO', '18'))
 SERVO_MIN_PWM = float(os.getenv('SERVO_MIN_PWM', '0.0006'))
 SERVO_MAX_PWM = float(os.getenv('SERVO_MAX_PWM', '0.0023'))
-SERVO_OPEN_ANGLE = float(os.getenv('SERVO_OPEN_ANGLE', '180'))
+SERVO_OPEN_ANGLE = float(os.getenv('SERVO_OPEN_ANGLE', '90'))
 SERVO_CLOSE_ANGLE = float(os.getenv('SERVO_CLOSE_ANGLE', '180'))
 
 # stepper motor config (carousel compartments)
