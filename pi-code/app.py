@@ -45,15 +45,56 @@ door_states = {}  # name -> bool (open/closed)
 
 # stepper motor control (carousel)
 stepper_pins = None
-carousel_ready = True  # whether the carousel is accepting new rotation requests
-stepper_thread = None  # background thread for stepper rotation
-stepper_stop_event = threading.Event()  # signal to stop rotation early
-stepper_rotating = threading.Event()  # set while rotation is in progress
-stepper_rotation_start_time = None  # when rotation started
-stepper_target_duration = None  # planned duration in seconds
-stepper_rotation_done = threading.Event()  # set when rotation finishes (normally or interrupted)
+carousel_ready = True
+stepper_thread = None
+stepper_stop_event = threading.Event()
+stepper_rotating = threading.Event()
+stepper_rotation_start_time = None
+stepper_target_duration = None
+stepper_rotation_done = threading.Event()
 
-STEPS_PER_COMPARTMENT = 9.1  # ~9 seconds at default step rate
+STEPS_PER_COMPARTMENT = 9.1
+TOTAL_COMPARTMENTS = 4          # adjust if you have more/fewer
+CAROUSEL_STATE_FILE = '/home/buddyboys/project-b/carousel_position.txt'
+
+def _load_carousel_position():
+    """Load last known compartment from disk. Returns 1 if unknown."""
+    try:
+        with open(CAROUSEL_STATE_FILE, 'r') as f:
+            val = int(f.read().strip())
+            if 1 <= val <= TOTAL_COMPARTMENTS:
+                return val
+    except Exception:
+        pass
+    return 1
+
+def _save_carousel_position(compartment):
+    """Persist current compartment to disk."""
+    try:
+        with open(CAROUSEL_STATE_FILE, 'w') as f:
+            f.write(str(compartment))
+    except Exception as e:
+        app.logger.warning('[carousel] failed to save position: %s', e)
+
+# load position at startup — defaults to 1 on first run
+current_compartment = _load_carousel_position()
+app.logger.info('[carousel] starting at compartment %s', current_compartment)
+
+
+def _shortest_path(current, target, total):
+    """
+    Return (steps, direction) for the shortest path between compartments.
+    direction=1 is forward, direction=-1 is backward.
+    steps is the number of compartment-steps to travel.
+    """
+    forward_steps = (target - current) % total
+    backward_steps = (current - target) % total
+
+    if forward_steps <= backward_steps:
+        return forward_steps, 1
+    else:
+        return backward_steps, -1
+
 
 def create_stepper():
     """Initialize the stepper motor pins."""
@@ -78,28 +119,29 @@ def create_stepper():
         return False
 
 
-def rotate_carousel(target_compartment, speed=STEPPER_STEP_DELAY, direction=1, wait=True):
-    """Spin the carousel to the target compartment (1-indexed)."""
-    global carousel_ready, stepper_rotation_start_time, stepper_target_duration
+def rotate_carousel(target_compartment, speed=STEPPER_STEP_DELAY, direction=None, wait=True):
+    """Spin the carousel to the target compartment via the shortest path."""
+    global carousel_ready, stepper_rotation_start_time, stepper_target_duration, current_compartment
+
     if stepper_pins is None:
-        app.logger.info('[carousel] rotation requested (stepper unavailable on this system)')
+        app.logger.info('[carousel] rotation requested (stepper unavailable)')
         return False
 
     # stop any ongoing rotation first
     if stepper_rotating.is_set():
         stop_carousel()
-        # wait for the old rotation thread to finish
         stepper_rotation_done.wait(timeout=3)
         stepper_rotation_done.clear()
 
-    # calculate the rotation time: each compartment ~9 seconds
-    # compartment 1 = 0 rotations (9s), com
-    # 2 = 9s, 3 = 18s, 4 = 27s
-    duration = (target_compartment - 1) * STEPS_PER_COMPARTMENT
-    if duration == 0:
-        # no rotation needed
+    steps, auto_direction = _shortest_path(current_compartment, target_compartment, TOTAL_COMPARTMENTS)
+    if direction is None:
+        direction = auto_direction
+
+    if steps == 0:
+        app.logger.info('[carousel] already at compartment %s, no rotation needed', target_compartment)
         return True
 
+    duration = steps * STEPS_PER_COMPARTMENT
     carousel_ready = False
     stepper_stop_event.clear()
     stepper_rotating.set()
@@ -107,19 +149,27 @@ def rotate_carousel(target_compartment, speed=STEPPER_STEP_DELAY, direction=1, w
     stepper_rotation_start_time = time.time()
     stepper_target_duration = duration
 
-    app.logger.info('[carousel] rotating to compartment %s (%s seconds)', target_compartment, duration)
-
-    # run stepper in background thread so it can be interrupted
-    stepper_thread = threading.Thread(
-        target=stepperMotor, args=(duration, direction), daemon=True
+    app.logger.info(
+        '[carousel] %s → %s: %s compartment(s) %s (%.1fs)',
+        current_compartment, target_compartment,
+        steps, 'forward' if direction == 1 else 'backward', duration
     )
+
+    def _run():
+        stepperMotor(duration, direction)
+        # update and persist position only after successful completion
+        if not stepper_stop_event.is_set():
+            global current_compartment
+            current_compartment = target_compartment
+            _save_carousel_position(current_compartment)
+            app.logger.info('[carousel] arrived at compartment %s', current_compartment)
+
+    stepper_thread = threading.Thread(target=_run, daemon=True)
     stepper_thread.start()
 
-    # optionally wait for rotation to complete (used by pickup endpoint)
     if wait:
         stepper_rotation_done.wait()
 
-    app.logger.info('[carousel] rotation to compartment %s complete', target_compartment)
     return True
 
 
