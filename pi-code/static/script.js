@@ -7,6 +7,7 @@ let dateBuffer = '';   // flat string ddmyyyy
 let userOrders = [];
 let currentPickupOrderId = null; // track which order was picked up for printing
 let qrPollInterval = null;
+let receiptPrinted = false; // track if receipt was printed (order already completed)
 
 // dispensing timer
 const DISPENSING_DURATION_DEFAULT = 10; // fallback seconds
@@ -172,11 +173,17 @@ function goTo(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 
-  // show/hide back button based on whether we're on welcome page
-  const backBtns = document.querySelectorAll('.back-btn');
-  backBtns.forEach(btn => {
-    btn.style.visibility = id === 'page-welcome' ? 'hidden' : 'visible';
-  });
+  if (id === 'page-end') {
+    // hide back/stop buttons on end page (no bottom-btns on that page)
+  }
+
+  // hide back button on welcome page
+  if (id !== 'page-end') {
+    const backBtns = document.querySelectorAll('.back-btn');
+    backBtns.forEach(btn => {
+      btn.style.visibility = id === 'page-welcome' ? 'hidden' : 'visible';
+    });
+  }
 
   if (id === 'page-dispensing') {
     startDispensingTimer();
@@ -419,8 +426,8 @@ async function stopProcessByTimeout() {
   if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
   hideTimeoutModal();
 
-  // mark order as failed to pick up
-  if (currentPickupOrderId) {
+  // only mark as failed if the order hasn't already been printed (which completes it)
+  if (currentPickupOrderId && !receiptPrinted) {
     try {
       await fetch('/api/user/failed_pickup/' + currentPickupOrderId, { method: 'POST' });
     } catch (e) {
@@ -481,6 +488,10 @@ async function printLeaflet() {
       showError(data.details || data.error || 'Afdrukken mislukt');
       btn.textContent = 'Opnieuw proberen';
       btn.disabled = false;
+    } else {
+      // receipt printed — backend already marked order as completed
+      receiptPrinted = true;
+      btn.textContent = '✓ Afgedrukt';
     }
   } catch (e) {
     showError('Verbindingsfout, probeer opnieuw.');
