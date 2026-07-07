@@ -830,11 +830,7 @@ def user_failed_pickup(order_id):
 
 @app.route('/api/door/close', methods=['POST'])
 def api_close_door():
-    """Stop carousel (if rotating) and close the compartment door."""
-    stopped = stop_carousel()
-    if stopped:
-        # wait briefly for stepper thread to shut down
-        stepper_rotation_done.wait(timeout=2)
+    """Close the compartment door (leave carousel to finish on its own)."""
     try:
         close_door()
         return jsonify({'status': 'ok'}), 200

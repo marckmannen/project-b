@@ -387,33 +387,23 @@ function updateTimerDisplay() {
   }
 }
 
-// stop process (normal manual stop — close servo door, mark order failed, reload to welcome)
+// stop process — close door, let carousel finish, reload to welcome
 async function stopProcess() {
-  resetInactivityTimer();
-
   // clear all timers
   if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
   if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
   hideTimeoutModal();
+  stopQrPolling();
 
   // reset state
   pinReset();
   dateReset();
 
-  // close the servo door
+  // close the servo door (carousel keeps running in background)
   try {
     await fetch('/api/door/close', { method: 'POST' });
   } catch (e) {
     console.error('[stop] error closing door:', e);
-  }
-
-  // mark order as failed if in pickup
-  if (currentPickupOrderId) {
-    try {
-      await fetch('/api/user/failed_pickup/' + currentPickupOrderId, { method: 'POST' });
-    } catch (e) {
-      console.error('[stop] error marking order failed:', e);
-    }
   }
 
   // reload page to return to welcome
