@@ -168,6 +168,7 @@ function toggleLang() {
 // navigation
 let autoAdvanceTimer = null;
 let navHistory = ['page-welcome']; // track navigation history for back button
+let endPageStarted = false; // guard against restarting end page timeout
 
 function goTo(id) {
   if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
@@ -204,9 +205,10 @@ function goTo(id) {
     startQrPolling();
   }
 
-  // start end page one-shot timeout (not resettable by clicks)
-  if (id === 'page-end') {
+  // start end page one-shot timeout (only once)
+  if (id === 'page-end' && !endPageStarted) {
     console.log('[timeout] navigating to page-end, starting end page timeout');
+    endPageStarted = true;
     startEndPageTimeout();
   }
 
