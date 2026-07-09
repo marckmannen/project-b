@@ -350,7 +350,7 @@
 
     document.getElementById('logout-btn').addEventListener('click', async function() {
       await fetch('/admin/logout', { method: 'POST', credentials: 'same-origin' });
-      window.location.href = '/admin/login';
+      window.location.href = '/';
     });
 
     let currentEditId = null;
