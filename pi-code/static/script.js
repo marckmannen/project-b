@@ -511,19 +511,27 @@ function resetInactivityTimer() {
 
   // check if we're on a page that shouldn't timeout
   const activePage = document.querySelector('.page.active');
+  console.log('[timeout] resetInactivityTimer on', activePage ? activePage.id : 'none');
   if (activePage && (activePage.id === 'page-admin' || activePage.id === 'page-welcome')) {
+    console.log('[timeout] excluded, returning');
     return;
   }
 
   // start inactivity timer
+  console.log('[timeout] starting timer for', INACTIVITY_LIMIT, 'ms');
   inactivityTimer = setTimeout(showTimeoutModal, INACTIVITY_LIMIT);
 }
 
 function showTimeoutModal() {
+  console.log('[timeout] showTimeoutModal firing');
   const modal = document.getElementById('timeout-modal');
-  if (!modal) return;
+  if (!modal) {
+    console.log('[timeout] modal not found!');
+    return;
+  }
 
   modal.classList.add('show');
+  console.log('[timeout] modal shown');
   timeoutCountdownValue = TIMEOUT_COUNTDOWN;
   updateTimeoutDisplay();
 
