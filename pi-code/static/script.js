@@ -511,7 +511,7 @@ function resetInactivityTimer() {
 
   // check if we're on a page that shouldn't timeout
   const activePage = document.querySelector('.page.active');
-  if (activePage && (activePage.id === 'page-admin' || activePage.id === 'page-welcome' || activePage.id === 'page-end')) {
+  if (activePage && (activePage.id === 'page-admin' || activePage.id === 'page-welcome')) {
     return;
   }
 
