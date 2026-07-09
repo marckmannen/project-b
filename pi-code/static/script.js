@@ -31,7 +31,6 @@ function startEndPageTimeout() {
     showTimeoutModal();
   }, INACTIVITY_LIMIT);
 }
-let endPageTimeout = null; // one-shot timeout for end page
 
 // translations
 const T = {
