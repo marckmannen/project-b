@@ -509,9 +509,9 @@ function resetInactivityTimer() {
   // hide timeout modal if visible
   hideTimeoutModal();
 
-  // check if we're on a page that shouldn't timeout (admin or welcome)
+  // check if we're on a page that shouldn't timeout
   const activePage = document.querySelector('.page.active');
-  if (activePage && (activePage.id === 'page-admin' || activePage.id === 'page-welcome')) {
+  if (activePage && (activePage.id === 'page-admin' || activePage.id === 'page-welcome' || activePage.id === 'page-end')) {
     return;
   }
 
