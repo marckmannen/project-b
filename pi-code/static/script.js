@@ -17,11 +17,21 @@ const TIMER_CIRCUMFERENCE = 2 * Math.PI * 54; // ~339.292
 let dispensingTotal = DISPENSING_DURATION_DEFAULT; // current total for progress ring
 
 // inactivity timeout
-const INACTIVITY_LIMIT = 60 * 1000; // 30 seconds
+const INACTIVITY_LIMIT = 60 * 1000; // 60 seconds
 const TIMEOUT_COUNTDOWN = 30; // seconds
 let inactivityTimer = null;
 let timeoutModalTimer = null;
 let timeoutCountdownValue = TIMEOUT_COUNTDOWN;
+let endPageTimeout = null; // one-shot timeout for end page
+
+function startEndPageTimeout() {
+  if (endPageTimeout) clearTimeout(endPageTimeout);
+  endPageTimeout = setTimeout(() => {
+    endPageTimeout = null;
+    showTimeoutModal();
+  }, INACTIVITY_LIMIT);
+}
+let endPageTimeout = null; // one-shot timeout for end page
 
 // translations
 const T = {
@@ -191,6 +201,11 @@ function goTo(id) {
 
   if (id === 'page-qr') {
     startQrPolling();
+  }
+
+  // start end page one-shot timeout (not resettable by clicks)
+  if (id === 'page-end') {
+    startEndPageTimeout();
   }
 
   resetInactivityTimer();
@@ -511,27 +526,19 @@ function resetInactivityTimer() {
 
   // check if we're on a page that shouldn't timeout
   const activePage = document.querySelector('.page.active');
-  console.log('[timeout] resetInactivityTimer on', activePage ? activePage.id : 'none');
-  if (activePage && (activePage.id === 'page-admin' || activePage.id === 'page-welcome')) {
-    console.log('[timeout] excluded, returning');
+  if (activePage && (activePage.id === 'page-admin' || activePage.id === 'page-welcome' || activePage.id === 'page-end')) {
     return;
   }
 
   // start inactivity timer
-  console.log('[timeout] starting timer for', INACTIVITY_LIMIT, 'ms');
   inactivityTimer = setTimeout(showTimeoutModal, INACTIVITY_LIMIT);
 }
 
 function showTimeoutModal() {
-  console.log('[timeout] showTimeoutModal firing');
   const modal = document.getElementById('timeout-modal');
-  if (!modal) {
-    console.log('[timeout] modal not found!');
-    return;
-  }
+  if (!modal) return;
 
   modal.classList.add('show');
-  console.log('[timeout] modal shown');
   timeoutCountdownValue = TIMEOUT_COUNTDOWN;
   updateTimeoutDisplay();
 
