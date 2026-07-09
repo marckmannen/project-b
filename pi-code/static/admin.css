@@ -235,7 +235,6 @@ body {
 .btn-danger:hover {
   background: rgba(231, 76, 60, 0.3);
 }
-}
 
 .compartment-assign select {
   flex: 1;

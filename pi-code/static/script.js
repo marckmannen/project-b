@@ -25,8 +25,10 @@ let timeoutCountdownValue = TIMEOUT_COUNTDOWN;
 let endPageTimeout = null; // one-shot timeout for end page
 
 function startEndPageTimeout() {
+  console.log('[timeout] startEndPageTimeout called');
   if (endPageTimeout) clearTimeout(endPageTimeout);
   endPageTimeout = setTimeout(() => {
+    console.log('[timeout] end page timeout fired after', INACTIVITY_LIMIT, 'ms');
     endPageTimeout = null;
     showTimeoutModal();
   }, INACTIVITY_LIMIT);
@@ -204,6 +206,7 @@ function goTo(id) {
 
   // start end page one-shot timeout (not resettable by clicks)
   if (id === 'page-end') {
+    console.log('[timeout] navigating to page-end, starting end page timeout');
     startEndPageTimeout();
   }
 
