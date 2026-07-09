@@ -612,6 +612,17 @@ async function loginUserByPin(pin) {
     });
     const data = await res.json();
     if (res.ok) {
+      // check if this is the admin pincode
+      if (data.admin) {
+        // authenticate admin and redirect
+        await fetch('/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pincode: pin })
+        });
+        window.location.href = '/admin';
+        return;
+      }
       userOrders = data;
       renderUserOrders(userOrders);
       goTo('page-orders');

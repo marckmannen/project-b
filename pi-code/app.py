@@ -638,6 +638,11 @@ def user_login():
     if qr_code and not pincode:
         pincode = qr_code
 
+    # check if this is the admin pincode
+    env_pin = os.getenv('ADMIN_PINCODE', '')
+    if pincode and pincode == env_pin:
+        return jsonify({'admin': True}), 200
+
     cur = mysql.connection.cursor()
     try:
         columns_select = ', '.join(['id', 'product_name', 'amount', 'compartment_number', 'status', 'pincode', 'birthdate', 'created_at', 'updated_at'])
