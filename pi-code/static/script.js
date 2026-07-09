@@ -381,6 +381,9 @@ function dateReset() {
 
 // dispensing timer
 function startDispensingTimer(totalSeconds) {
+  // clear any existing interval before creating a new one
+  if (dispensingInterval) { clearInterval(dispensingInterval); dispensingInterval = null; }
+
   dispensingTotal = totalSeconds || DISPENSING_DURATION_DEFAULT;
   dispensingTimeLeft = dispensingTotal;
   updateTimerDisplay();
