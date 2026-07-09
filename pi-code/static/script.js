@@ -599,6 +599,9 @@ document.addEventListener('touchstart', resetInactivityTimer);
 applyLang();
 resetInactivityTimer();
 
+// always close door on page load so a refresh leaves the vault locked
+fetch('/api/door/close', { method: 'POST' }).catch(() => {});
+
 // ── User Login ──
 async function loginUserByPin(pin) {
   try {
